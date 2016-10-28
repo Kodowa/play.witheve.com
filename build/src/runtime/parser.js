@@ -1610,6 +1610,8 @@ function parseDoc(doc, docId) {
     var allErrors = [];
     for (var _i = 0, blocks_1 = blocks; _i < blocks_1.length; _i++) {
         var block = blocks_1[_i];
+        if (block.info !== "" && block.info.indexOf("eve") === -1)
+            continue;
         var _b = parseBlock(block.literal, block.id, block.startOffset, spans, extraInfo), results = _b.results, lex = _b.lex, errors = _b.errors;
         extraInfo[block.id] = { info: block.info };
         // if this block is disabled, we want the parsed spans and such, but we don't want

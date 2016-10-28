@@ -4,6 +4,12 @@ var renderer_1 = require("./renderer");
 var ide_1 = require("./ide");
 var browser = require("./runtime/browser");
 var db_1 = require("./db");
+function analyticsEvent(kind, label, value) {
+    var ga = window["ga"];
+    if (!ga)
+        return;
+    ga("send", "event", "ide", kind, label, value);
+}
 // @NOTE: Intrepid user: Please don't change this. It won't work just yet!
 window["local"] = true;
 //---------------------------------------------------------
@@ -369,6 +375,7 @@ _ide.onLoadFile = function (ide, documentId, code) {
         exports.socket.send(JSON.stringify({ type: "eval", persist: false }));
     }
     history.pushState({}, "", location.pathname + ("#/examples/" + documentId));
+    analyticsEvent("load-document", documentId);
 };
 _ide.onTokenInfo = function (ide, tokenId) {
     if (exports.socket && exports.socket.readyState == 1) {
