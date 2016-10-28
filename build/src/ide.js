@@ -1144,6 +1144,16 @@ var Editor = (function () {
                 return -1;
             if (b.isLine && !a.isLine)
                 return 1;
+            if (a.start && !b.start)
+                return 1;
+            if (b.start && !a.start)
+                return -1;
+            if (a.source.type === b.source.type)
+                return 0;
+            else if (a.source.type === "link")
+                return a.start ? 1 : -1;
+            else if (b.source.type === "link")
+                return b.start ? -1 : 1;
             return 0;
         });
         var pos = 0;
