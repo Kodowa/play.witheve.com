@@ -368,7 +368,7 @@ _ide.onLoadFile = function (ide, documentId, code) {
         exports.socket.send(JSON.stringify({ scope: "root", type: "parse", code: code }));
         exports.socket.send(JSON.stringify({ type: "eval", persist: false }));
     }
-    history.pushState({}, "", "/#/examples/" + documentId);
+    history.pushState({}, "", location.pathname + ("#/examples/" + documentId));
 };
 _ide.onTokenInfo = function (ide, tokenId) {
     if (exports.socket && exports.socket.readyState == 1) {
