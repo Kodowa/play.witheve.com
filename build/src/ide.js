@@ -1664,14 +1664,14 @@ var Editor = (function () {
     // @NOTE: Does this belong in the IDE?
     Editor.prototype.controls = function () {
         var _this = this;
-        var inspectorButton = { c: "inspector-button ion-wand", text: "", click: function () { return _this.ide.toggleInspecting(); } };
+        var inspectorButton = { c: "inspector-button ion-wand", text: "", title: "Inspect", click: function () { return _this.ide.toggleInspecting(); } };
         if (this.ide.inspectingClick)
             inspectorButton.c += " waiting";
         else if (this.ide.inspecting)
             inspectorButton.c += " inspecting";
         return { c: "flex-row controls", children: [
-                { c: "ion-refresh", click: function () { return _this.ide.eval(false); } },
-                { c: "ion-ios-play", click: function () { return _this.ide.eval(true); } },
+                { c: "ion-refresh", title: "Reset (⌃⇧⏎ or ⇧⌘⏎ )", click: function () { return _this.ide.eval(false); } },
+                { c: "ion-ios-play", title: "Run (⌃⏎ or ⌘⏎)", click: function () { return _this.ide.eval(true); } },
                 inspectorButton
             ] };
     };

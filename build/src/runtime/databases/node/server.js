@@ -27,16 +27,16 @@ var ServerDatabase = (function (_super) {
         var requestId = "request|" + this.requestId++ + "|" + (new Date()).getTime();
         this.requestToResponse[requestId] = response;
         var actions = [
-            new actions_1.InsertAction(requestId, "tag", "request", undefined, scopes),
-            new actions_1.InsertAction(requestId, "url", request.url, undefined, scopes),
+            new actions_1.InsertAction("server|tag", requestId, "tag", "request", undefined, scopes),
+            new actions_1.InsertAction("server|url", requestId, "url", request.url, undefined, scopes),
         ];
         if (request.headers) {
             var headerId = requestId + "|body";
             for (var _i = 0, _a = Object.keys(request.headers); _i < _a.length; _i++) {
                 var key = _a[_i];
-                actions.push(new actions_1.InsertAction(headerId, key, request.headers[key], undefined, scopes));
+                actions.push(new actions_1.InsertAction("server|header", headerId, key, request.headers[key], undefined, scopes));
             }
-            actions.push(new actions_1.InsertAction(requestId, "headers", headerId, undefined, scopes));
+            actions.push(new actions_1.InsertAction("server|headers", requestId, "headers", headerId, undefined, scopes));
         }
         if (request.body) {
             var body = request.body;
@@ -46,11 +46,11 @@ var ServerDatabase = (function (_super) {
                 var bodyId = requestId + "|body";
                 for (var _b = 0, _c = Object.keys(body); _b < _c.length; _b++) {
                     var key = _c[_b];
-                    actions.push(new actions_1.InsertAction(bodyId, key, body[key], undefined, scopes));
+                    actions.push(new actions_1.InsertAction("server|request-body-entry", bodyId, key, body[key], undefined, scopes));
                 }
                 body = bodyId;
             }
-            actions.push(new actions_1.InsertAction(requestId, "body", body, undefined, scopes));
+            actions.push(new actions_1.InsertAction("server|request-body", requestId, "body", body, undefined, scopes));
         }
         var evaluation = this.evaluations[0];
         evaluation.executeActions(actions);
@@ -93,7 +93,7 @@ var ServerDatabase = (function (_super) {
                         continue;
                     var response = responses[0];
                     var _c = index.asObject(response), status_1 = _c.status, body = _c.body;
-                    actions.push(new actions_1.InsertAction(e, "tag", "sent", undefined, [name]));
+                    actions.push(new actions_1.InsertAction("server|sender", e, "tag", "sent", undefined, [name]));
                     this.sendResponse(e, status_1[0], body[0]);
                 }
             }

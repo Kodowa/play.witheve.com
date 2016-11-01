@@ -70,7 +70,7 @@ var HttpDatabase = (function (_super) {
                 if (index.lookup(e, "tag", "request") && !index.lookup(e, "tag", "sent")) {
                     var request = index.asObject(e);
                     if (request.url) {
-                        actions.push(new actions_1.InsertAction(e, "tag", "sent", undefined, [name]));
+                        actions.push(new actions_1.InsertAction("http|sender", e, "tag", "sent", undefined, [name]));
                         this.sendRequest(evaluation, e, request);
                     }
                 }
