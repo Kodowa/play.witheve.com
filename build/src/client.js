@@ -227,7 +227,9 @@ var EveClient = (function () {
         }, 30000);
     };
     EveClient.prototype.onClose = function () {
-        this.injectNotice("warning", "The editor has lost connection to the Eve server. All changes will be made locally.");
+        if (!this.localControl) {
+            this.injectNotice("warning", "The editor has lost connection to the Eve server. All changes will be made locally.");
+        }
     };
     EveClient.prototype.onMessage = function (event) {
         var data = JSON.parse(event.data);
