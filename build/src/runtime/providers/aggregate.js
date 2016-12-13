@@ -12,31 +12,32 @@ var providers = require("./index");
 var Aggregate = (function (_super) {
     __extends(Aggregate, _super);
     function Aggregate(id, args, returns) {
-        _super.call(this, id, args, returns);
+        var _this = _super.call(this, id, args, returns) || this;
         var value = args[0], given = args[1], per = args[2];
         if (given === undefined) {
-            this.projectionVars = [];
+            _this.projectionVars = [];
         }
         else if (join_1.isVariable(given)) {
-            this.projectionVars = [given];
+            _this.projectionVars = [given];
         }
         else {
-            this.projectionVars = given;
+            _this.projectionVars = given;
         }
         if (per === undefined) {
-            this.groupVars = [];
+            _this.groupVars = [];
         }
         else if (join_1.isVariable(per)) {
-            this.groupVars = [per];
+            _this.groupVars = [per];
         }
         else {
-            this.groupVars = per;
+            _this.groupVars = per;
         }
-        this.value = value;
-        this.resolvedGroup = [];
-        this.resolvedProjection = [];
-        this.resolvedAggregate = { group: this.resolvedGroup, projection: this.resolvedProjection, value: undefined };
-        this.aggregateResults = {};
+        _this.value = value;
+        _this.resolvedGroup = [];
+        _this.resolvedProjection = [];
+        _this.resolvedAggregate = { group: _this.resolvedGroup, projection: _this.resolvedProjection, value: undefined };
+        _this.aggregateResults = {};
+        return _this;
     }
     Aggregate.prototype.resolveAggregate = function (prefix) {
         join_1.resolve(this.projectionVars, prefix, this.resolvedProjection);
@@ -104,19 +105,19 @@ var Aggregate = (function (_super) {
         return proposal;
     };
     Aggregate.prototype.finalizeGroup = function (group) { };
-    Aggregate.isAggregate = true;
-    Aggregate.AttributeMapping = {
-        "value": 0,
-        "given": 1,
-        "per": 2,
-    };
     return Aggregate;
 }(join_1.Constraint));
+Aggregate.isAggregate = true;
+Aggregate.AttributeMapping = {
+    "value": 0,
+    "given": 1,
+    "per": 2,
+};
 exports.Aggregate = Aggregate;
 var Sum = (function (_super) {
     __extends(Sum, _super);
     function Sum() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Sum.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -133,7 +134,7 @@ exports.Sum = Sum;
 var Count = (function (_super) {
     __extends(Count, _super);
     function Count() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Count.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -150,7 +151,7 @@ exports.Count = Count;
 var Average = (function (_super) {
     __extends(Average, _super);
     function Average() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Average.prototype.adjustAggregate = function (group, value, projection) {
         if (group.count === undefined) {
@@ -171,7 +172,7 @@ exports.Average = Average;
 var Min = (function (_super) {
     __extends(Min, _super);
     function Min() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Min.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -188,7 +189,7 @@ exports.Min = Min;
 var Max = (function (_super) {
     __extends(Max, _super);
     function Max() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Max.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -202,9 +203,83 @@ var Max = (function (_super) {
     return Max;
 }(Aggregate));
 exports.Max = Max;
+var Join = (function (_super) {
+    __extends(Join, _super);
+    function Join(id, args, returns) {
+        var _this = _super.call(this, id, args, returns) || this;
+        _this.token = args[0];
+        _this.index = args[3];
+        _this.sepwith = args[4];
+        return _this;
+    }
+    Join.prototype.aggregate = function (rows) {
+        var groupKeys = [];
+        var groups = {};
+        for (var _i = 0, rows_2 = rows; _i < rows_2.length; _i++) {
+            var row = rows_2[_i];
+            join_1.resolve(this.projectionVars, row, this.resolvedProjection);
+            join_1.resolve(this.groupVars, row, this.resolvedGroup);
+            var group = this.resolvedAggregate.group;
+            var projection = this.resolvedAggregate.projection;
+            var token = join_1.toValue(this.token, row);
+            var index = join_1.toValue(this.index, row);
+            var sepwith = join_1.toValue(this.sepwith, row);
+            if (sepwith === undefined)
+                sepwith = "";
+            var groupKey = "[]";
+            if (group.length !== 0) {
+                groupKey = JSON.stringify(group);
+            }
+            var groupValues = groups[groupKey];
+            if (groupValues === undefined) {
+                groupKeys.push(groupKey);
+                groupValues = groups[groupKey] = { result: [] };
+            }
+            var projectionKey = JSON.stringify(projection);
+            if (groupValues[projectionKey] === undefined) {
+                groupValues[projectionKey] = true;
+                groupValues.result.push({ token: token, index: index, sepwith: sepwith });
+            }
+        }
+        for (var g in groups) {
+            var s = groups[g].result.sort(function (a, b) {
+                if (a.index > b.index)
+                    return 1;
+                if (a.index === b.index)
+                    return 0;
+                return -1;
+            });
+            var len = s.length;
+            var result = "";
+            for (var i = 0; i < len; ++i) {
+                // this means that the sep assocated with a value
+                // is the one which occurs before the value
+                if (i != 0)
+                    result += s[i].sepwith;
+                result += s[i].token;
+            }
+            groups[g].result = result;
+        }
+        this.aggregateResults = groups;
+        return groups;
+    };
+    // unused but to keep mr. class happy
+    Join.prototype.adjustAggregate = function (group, value, projection) { };
+    return Join;
+}(Aggregate));
+Join.AttributeMapping = {
+    "value": 0,
+    "given": 1,
+    "per": 2,
+    "index": 3,
+    "with": 4,
+    "token": 0
+};
+exports.Join = Join;
 providers.provide("sum", Sum);
 providers.provide("count", Count);
 providers.provide("average", Average);
+providers.provide("join", Join);
 providers.provide("min", Min);
 providers.provide("max", Max);
 //# sourceMappingURL=aggregate.js.map

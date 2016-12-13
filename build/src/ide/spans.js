@@ -205,16 +205,17 @@ var Span = (function () {
     Span.style = function () {
         return this._spanStyle;
     };
-    Span._nextId = 0;
-    Span._editorControlled = true;
     return Span;
 }());
+Span._nextId = 0;
+Span._editorControlled = true;
 exports.Span = Span;
 var InlineSpan = (function (_super) {
     __extends(InlineSpan, _super);
     function InlineSpan() {
-        _super.apply(this, arguments);
-        this._spanStyle = "inline";
+        var _this = _super.apply(this, arguments) || this;
+        _this._spanStyle = "inline";
+        return _this;
     }
     InlineSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -278,15 +279,16 @@ var InlineSpan = (function (_super) {
         this.clear("+normalize");
         this.editor.markSpan(from, to, this.source);
     };
-    InlineSpan._spanStyle = "inline";
     return InlineSpan;
 }(Span));
+InlineSpan._spanStyle = "inline";
 exports.InlineSpan = InlineSpan;
 var LineSpan = (function (_super) {
     __extends(LineSpan, _super);
     function LineSpan() {
-        _super.apply(this, arguments);
-        this._spanStyle = "line";
+        var _this = _super.apply(this, arguments) || this;
+        _this._spanStyle = "line";
+        return _this;
     }
     LineSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -374,15 +376,16 @@ var LineSpan = (function (_super) {
         var cur = doc.getRange(loc.from, to);
         doc.replaceRange(cur.trim(), loc.from, to, "+normalize");
     };
-    LineSpan._spanStyle = "line";
     return LineSpan;
 }(Span));
+LineSpan._spanStyle = "line";
 exports.LineSpan = LineSpan;
 var BlockSpan = (function (_super) {
     __extends(BlockSpan, _super);
     function BlockSpan() {
-        _super.apply(this, arguments);
-        this._spanStyle = "block";
+        var _this = _super.apply(this, arguments) || this;
+        _this._spanStyle = "block";
+        return _this;
     }
     BlockSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -452,14 +455,14 @@ var BlockSpan = (function (_super) {
             this.editor.markSpan(from, to, this.source);
         }
     };
-    BlockSpan._spanStyle = "block";
     return BlockSpan;
 }(Span));
+BlockSpan._spanStyle = "block";
 exports.BlockSpan = BlockSpan;
 var ListItemSpan = (function (_super) {
     __extends(ListItemSpan, _super);
     function ListItemSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     ListItemSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -499,7 +502,7 @@ var ListItemSpan = (function (_super) {
 var HeadingSpan = (function (_super) {
     __extends(HeadingSpan, _super);
     function HeadingSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     HeadingSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -547,7 +550,7 @@ exports.HeadingSpan = HeadingSpan;
 var ElisionSpan = (function (_super) {
     __extends(ElisionSpan, _super);
     function ElisionSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     ElisionSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -586,12 +589,20 @@ var ElisionSpan = (function (_super) {
 var CodeBlockSpan = (function (_super) {
     __extends(CodeBlockSpan, _super);
     function CodeBlockSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
+    CodeBlockSpan.prototype.syntax = function () {
+        return this.source.info ? this.source.info.toLowerCase().split(" ")[0] : "eve";
+    };
+    // @TODO: replace with style-by-block when multi-language styling can be integrated
+    CodeBlockSpan.prototype.syntaxHighlight = function () {
+        // provide codemirror syntax highlight indications for css blocks only
+        return this.syntax() === "css" ? "cm-s-default" : "";
+    };
     CodeBlockSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
-        this.lineBackgroundClass = "code";
-        this.lineTextClass = "code-text";
+        this.lineBackgroundClass = "code " + this.syntax();
+        this.lineTextClass = "code-text " + this.syntaxHighlight();
         if (this.source.disabled)
             this.disabled = this.source.disabled;
         else
@@ -622,7 +633,7 @@ var CodeBlockSpan = (function (_super) {
     };
     CodeBlockSpan.prototype.disable = function () {
         if (!this.disabled) {
-            this.source.info = "eve disabled";
+            this.source.info = this.syntax() + " disabled";
             // @FIXME: We don't currently style this because of a bug in updateLineClasses.
             // It's unable to intelligently remove unsupported classes, so we'd have to manually clear line classes.
             // We can come back to this later if we care.
@@ -636,7 +647,7 @@ var CodeBlockSpan = (function (_super) {
     };
     CodeBlockSpan.prototype.enable = function () {
         if (this.disabled) {
-            this.source.info = "eve";
+            this.source.info = this.syntax();
             this.disabled = false;
             this.refresh();
             this.editor.dirty = true;
@@ -654,6 +665,12 @@ var CodeBlockSpan = (function (_super) {
             this.footerWidget.clear();
         this.widgetElem = document.createElement("div");
         this.widgetElem.className = "code-controls-widget";
+        if (this.syntax() !== "eve") {
+            this.languageLabelElem = document.createElement("div");
+            this.languageLabelElem.className = "code-language-label";
+            this.languageLabelElem.textContent = this.syntax().toUpperCase();
+            this.widgetElem.appendChild(this.languageLabelElem);
+        }
         this.enableToggleElem = document.createElement("div");
         this.enableToggleElem.classList.add("enable-btn");
         this.enableToggleElem.onclick = function () {
@@ -668,6 +685,8 @@ var CodeBlockSpan = (function (_super) {
         this.updateWidgets();
     };
     CodeBlockSpan.prototype.clearWidgets = function () {
+        if (!this.widget)
+            return;
         this.widget.clear();
         this.footerWidget.clear();
         this.widget = this.widgetElem = this.widgetLine = undefined;
@@ -706,7 +725,7 @@ exports.CodeBlockSpan = CodeBlockSpan;
 var WhitespaceSpan = (function (_super) {
     __extends(WhitespaceSpan, _super);
     function WhitespaceSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     WhitespaceSpan.prototype.normalize = function () {
         _super.prototype.normalize.call(this);
@@ -717,7 +736,7 @@ var WhitespaceSpan = (function (_super) {
 var BlockAnnotationSpan = (function (_super) {
     __extends(BlockAnnotationSpan, _super);
     function BlockAnnotationSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     BlockAnnotationSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -762,7 +781,7 @@ exports.BlockAnnotationSpan = BlockAnnotationSpan;
 var AnnotationSpan = (function (_super) {
     __extends(AnnotationSpan, _super);
     function AnnotationSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     AnnotationSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -807,19 +826,20 @@ exports.AnnotationSpan = AnnotationSpan;
 var ParserSpan = (function (_super) {
     __extends(ParserSpan, _super);
     function ParserSpan() {
-        _super.apply(this, arguments);
-        this._editorControlled = false;
-        this._spanStyle = "inline";
+        var _this = _super.apply(this, arguments) || this;
+        _this._editorControlled = false;
+        _this._spanStyle = "inline";
+        return _this;
     }
-    ParserSpan._editorControlled = false;
-    ParserSpan._spanStyle = "inline";
     return ParserSpan;
 }(Span));
+ParserSpan._editorControlled = false;
+ParserSpan._spanStyle = "inline";
 exports.ParserSpan = ParserSpan;
 var DocumentCommentSpan = (function (_super) {
     __extends(DocumentCommentSpan, _super);
     function DocumentCommentSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     DocumentCommentSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -905,7 +925,7 @@ exports.DocumentCommentSpan = DocumentCommentSpan;
 var DocumentWidgetSpan = (function (_super) {
     __extends(DocumentWidgetSpan, _super);
     function DocumentWidgetSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     DocumentWidgetSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -983,7 +1003,7 @@ exports.DocumentWidgetSpan = DocumentWidgetSpan;
 var BadgeSpan = (function (_super) {
     __extends(BadgeSpan, _super);
     function BadgeSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     BadgeSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -1013,7 +1033,7 @@ var BadgeSpan = (function (_super) {
 var LinkSpan = (function (_super) {
     __extends(LinkSpan, _super);
     function LinkSpan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     LinkSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }

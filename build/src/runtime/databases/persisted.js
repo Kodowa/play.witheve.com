@@ -11,7 +11,7 @@ var runtime_1 = require("../runtime");
 var PersistedDatabase = (function (_super) {
     __extends(PersistedDatabase, _super);
     function PersistedDatabase() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     PersistedDatabase.prototype.onFixpoint = function (evaluation, changes) {
         _super.prototype.onFixpoint.call(this, evaluation, changes);

@@ -205,6 +205,16 @@ var BuilderContext = (function () {
 //-----------------------------------------------------------
 // Scans
 //-----------------------------------------------------------
+function checkBlockForVariable(block, variableName) {
+    var curBlock = block;
+    while (curBlock) {
+        var found = curBlock.variables[variableName];
+        if (found)
+            return found;
+        curBlock = curBlock.parent;
+    }
+    return;
+}
 function checkSubBlockEqualities(context, block) {
     // if we have an equality that is with a constant, then we need to add
     // a node for that equality since we couldn't fold the constant into the variable
@@ -292,6 +302,9 @@ function buildScans(block, context, scanLikes, outputScans) {
                 node = context.getValue(scanLike.node);
                 context.provide(node);
             }
+            if (!(entity || attribute || value || node)) {
+                context.errors.push(errors.blankScan(block, scanLike));
+            }
             var final = new join.Scan(scanLike.id + "|build", entity, attribute, value, node, scanLike.scopes);
             outputScans.push(final);
             scanLike.buildId = final.id;
@@ -302,9 +315,8 @@ function buildScans(block, context, scanLikes, outputScans) {
             notContext.nonProviding = true;
             var args = [];
             var seen = [];
-            var blockVars = block.variables;
             for (var variableName in scanLike.variables) {
-                var cur = blockVars[variableName];
+                var cur = checkBlockForVariable(block, variableName);
                 if (!cur)
                     continue;
                 var value = notContext.getValue(cur);
@@ -322,7 +334,6 @@ function buildScans(block, context, scanLikes, outputScans) {
             var seen = [];
             var args = [];
             var branches = [];
-            var blockVars = block.variables;
             var hasAggregate = false;
             for (var _e = 0, _f = scanLike.outputs; _e < _f.length; _e++) {
                 var variable = _f[_e];
@@ -336,7 +347,7 @@ function buildScans(block, context, scanLikes, outputScans) {
                 checkSubBlockEqualities(context, branch.block);
                 var branchContext = context.extendTo(branch.block);
                 for (var variableName in branch.block.variables) {
-                    var cur = blockVars[variableName];
+                    var cur = checkBlockForVariable(branch.block.parent, variableName);
                     if (!cur)
                         continue;
                     var value = branchContext.getValue(cur);
@@ -362,8 +373,17 @@ function buildScans(block, context, scanLikes, outputScans) {
             for (var _l = 0, _m = scanLike.outputs; _l < _m.length; _l++) {
                 var output = _m[_l];
                 var resolved = context.getValue(output);
-                outputs.push(resolved);
-                context.provide(resolved);
+                if (!join.isVariable(resolved)) {
+                    var variable = context.createVariable();
+                    var impl = providers.get("=");
+                    outputScans.push(new impl(output.id + "|equality|build", [variable, resolved], []));
+                    outputs.push(variable);
+                    context.provide(variable);
+                }
+                else {
+                    outputs.push(resolved);
+                    context.provide(resolved);
+                }
             }
             var ifScan = new join.IfScan(scanLike.id + "|build", args, outputs, branches, hasAggregate);
             outputScans.push(ifScan);
@@ -526,7 +546,8 @@ function buildActions(block, context, actions, scans) {
             var entity = action.entity, value = action.value, attribute = action.attribute;
             var impl = actions_1.ActionImplementations[action.action];
             if (action.action === "erase") {
-                var final = new impl(action.id + "|build", context.getValue(entity), attribute, undefined, undefined, action.scopes);
+                var attributeValue = attribute && attribute.type !== undefined ? context.getValue(attribute) : attribute;
+                var final = new impl(action.id + "|build", context.getValue(entity), attributeValue, undefined, undefined, action.scopes);
                 actionObjects.push(final);
                 action.buildId = final.id;
             }
@@ -560,9 +581,19 @@ function buildActions(block, context, actions, scans) {
 //-----------------------------------------------------------
 // Stratifier
 //-----------------------------------------------------------
+function isAggregate(scan) {
+    if (scan instanceof aggregate_1.Aggregate ||
+        scan instanceof sort_1.Sort ||
+        scan.hasAggregate ||
+        (scan.strata && scan.strata.length > 1)) {
+        return true;
+    }
+    return false;
+}
 function stratify(scans) {
     if (!scans.length)
         return [new block_1.BlockStratum([], [])];
+    var aggregates = [];
     var variableInfo = {};
     var blockLevel = {};
     var provide = function (variable, scan) {
@@ -580,10 +611,10 @@ function stratify(scans) {
             var minLevel = level;
             for (var _i = 0, _a = info.providers; _i < _a.length; _i++) {
                 var provider = _a[_i];
-                var providerLevel = blockLevel[scan.id] || 0;
+                var providerLevel = blockLevel[provider.id] || 0;
                 minLevel = Math.min(minLevel, providerLevel);
             }
-            info.level = level;
+            info.level = minLevel;
         }
     };
     for (var _i = 0, scans_1 = scans; _i < scans_1.length; _i++) {
@@ -594,13 +625,11 @@ function stratify(scans) {
             provide(scan.v, scan);
         }
         else if (scan instanceof aggregate_1.Aggregate || scan instanceof sort_1.Sort) {
+            aggregates.push(scan);
+            blockLevel[scan.id] = 1;
             for (var _a = 0, _b = scan.returns; _a < _b.length; _a++) {
                 var ret = _b[_a];
                 provide(ret, scan);
-                blockLevel[scan.id] = 1;
-                if (join.isVariable(ret)) {
-                    variableInfo[ret.id].level = 1;
-                }
             }
         }
         else if (scan instanceof join.Constraint) {
@@ -618,6 +647,19 @@ function stratify(scans) {
         else if (scan instanceof join.NotScan) {
         }
     }
+    // Before we start to stratify, we need to run through all the aggregates
+    // to determine what level their returns should be at. If the aggregate is
+    // the only provider for the return, then it should be at the same level as
+    // the aggregate itself. If, however, there are other scans that provide the
+    // return, we want to pick up their level instead.
+    for (var _g = 0, aggregates_1 = aggregates; _g < aggregates_1.length; _g++) {
+        var aggregate = aggregates_1[_g];
+        var level = blockLevel[aggregate.id];
+        for (var _h = 0, _j = aggregate.returns; _h < _j.length; _h++) {
+            var variable = _j[_h];
+            maybeLevelVariable(aggregate, level, variable);
+        }
+    }
     var round = 0;
     var changed = true;
     while (changed && round <= scans.length) {
@@ -627,15 +669,9 @@ function stratify(scans) {
         // Now check all of the scans vars and see if you are either the only
         // provider or if all the providers are now in a higher level. If so,
         // the variable's level is set to the scan's new level.
-        for (var _g = 0, scans_2 = scans; _g < scans_2.length; _g++) {
-            var scan = scans_2[_g];
-            var isAggregate = false;
-            if (scan instanceof aggregate_1.Aggregate ||
-                scan instanceof sort_1.Sort ||
-                scan.hasAggregate ||
-                (scan.strata && scan.strata.length > 1)) {
-                isAggregate = true;
-            }
+        for (var _k = 0, scans_2 = scans; _k < scans_2.length; _k++) {
+            var scan = scans_2[_k];
+            var isAgg = isAggregate(scan);
             var levelMax = 0;
             var scanLevel = blockLevel[scan.id] || 0;
             var dependentVariables = void 0;
@@ -651,8 +687,8 @@ function stratify(scans) {
             else {
                 throw new Error("Scan that I don't know how to stratify: " + scan);
             }
-            for (var _h = 0, dependentVariables_1 = dependentVariables; _h < dependentVariables_1.length; _h++) {
-                var variable = dependentVariables_1[_h];
+            for (var _l = 0, dependentVariables_1 = dependentVariables; _l < dependentVariables_1.length; _l++) {
+                var variable = dependentVariables_1[_l];
                 if (join.isVariable(variable)) {
                     var info = variableInfo[variable.id];
                     var infoLevel = 0;
@@ -660,8 +696,18 @@ function stratify(scans) {
                         infoLevel = info.level;
                     }
                     // if this is an aggregate, we always have to be in the level that is
-                    // one greater than all our dependencies
-                    if (isAggregate) {
+                    // one greater than all our dependencies.
+                    // In the event that one of our dependencies is filtered by an aggregate,
+                    // we stratify ourselves behind it.
+                    if (isAgg && info) {
+                        for (var _m = 0, _o = info.providers; _m < _o.length; _m++) {
+                            var provider = _o[_m];
+                            if (isAggregate(provider) && provider !== scan) {
+                                if (blockLevel[provider.id] > infoLevel) {
+                                    infoLevel = blockLevel[provider.id];
+                                }
+                            }
+                        }
                         infoLevel += 1;
                     }
                     levelMax = Math.max(levelMax, infoLevel);
@@ -671,8 +717,8 @@ function stratify(scans) {
                 changed = true;
                 blockLevel[scan.id] = levelMax;
                 if (returnVariables) {
-                    for (var _j = 0, returnVariables_1 = returnVariables; _j < returnVariables_1.length; _j++) {
-                        var variable = returnVariables_1[_j];
+                    for (var _p = 0, returnVariables_1 = returnVariables; _p < returnVariables_1.length; _p++) {
+                        var variable = returnVariables_1[_p];
                         maybeLevelVariable(scan, levelMax, variable);
                     }
                 }
@@ -684,8 +730,8 @@ function stratify(scans) {
         throw new Error("Stratification cycle");
     }
     var strata = [{ scans: [], aggregates: [] }];
-    for (var _k = 0, scans_3 = scans; _k < scans_3.length; _k++) {
-        var scan = scans_3[_k];
+    for (var _q = 0, scans_3 = scans; _q < scans_3.length; _q++) {
+        var scan = scans_3[_q];
         var scanStratum = blockLevel[scan.id];
         if (scanStratum !== undefined) {
             var level = strata[scanStratum];
@@ -700,10 +746,9 @@ function stratify(scans) {
             strata[0].scans.push(scan);
         }
     }
-    // console.log(inspect(strata, {colors: true, depth: 10}));
     var built = [];
-    for (var _l = 0, strata_1 = strata; _l < strata_1.length; _l++) {
-        var level = strata_1[_l];
+    for (var _r = 0, strata_1 = strata; _r < strata_1.length; _r++) {
+        var level = strata_1[_r];
         if (level) {
             built.push(new block_1.BlockStratum(level.scans, level.aggregates));
         }

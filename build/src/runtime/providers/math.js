@@ -9,384 +9,479 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var join_1 = require("../join");
 var providers = require("./index");
+var TotalFunctionConstraint = (function (_super) {
+    __extends(TotalFunctionConstraint, _super);
+    function TotalFunctionConstraint() {
+        return _super.apply(this, arguments) || this;
+    }
+    // Proposes the return value of the total function as the value for the
+    // proposed variable.
+    TotalFunctionConstraint.prototype.resolveProposal = function (proposal, prefix) {
+        var args = this.resolve(prefix).args;
+        var result = this.getReturnValue(args);
+        if (isNaN(result)) {
+            return [];
+        }
+        return [result];
+    };
+    // Check if our return is equivalent to the result of the total function.
+    TotalFunctionConstraint.prototype.test = function (prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        return this.getReturnValue(args) === returns[0];
+    };
+    // Total functions always have a cardinality of 1
+    TotalFunctionConstraint.prototype.getProposal = function (tripleIndex, proposed, prefix) {
+        var proposal = this.proposalObject;
+        proposal.providing = proposed;
+        proposal.cardinality = 1;
+        return proposal;
+    };
+    return TotalFunctionConstraint;
+}(join_1.Constraint));
+var TrigConstraint = (function (_super) {
+    __extends(TrigConstraint, _super);
+    function TrigConstraint() {
+        return _super.apply(this, arguments) || this;
+    }
+    TrigConstraint.prototype.resolveTrigAttributes = function (args) {
+        var degrees = args[0];
+        var radians = args[1];
+        //degrees which overrides radians. 
+        if (!isNaN(degrees)) {
+            radians = degreesToRadians(degrees);
+        }
+        return radians;
+    };
+    return TrigConstraint;
+}(TotalFunctionConstraint));
+TrigConstraint.AttributeMapping = {
+    "degrees": 0,
+    "radians": 1
+};
+var ValueOnlyConstraint = (function (_super) {
+    __extends(ValueOnlyConstraint, _super);
+    function ValueOnlyConstraint() {
+        return _super.apply(this, arguments) || this;
+    }
+    return ValueOnlyConstraint;
+}(TotalFunctionConstraint));
+ValueOnlyConstraint.AttributeMapping = {
+    "value": 0
+};
+function radiansToDegrees(radians) {
+    return radians * (180 / Math.PI);
+}
+function degreesToRadians(degrees) {
+    return degrees * (Math.PI / 180);
+}
 var Add = (function (_super) {
     __extends(Add, _super);
     function Add() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    // Add proposes the addition of its args as its value for the
-    // proposed variable.
     Add.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
-        return [args[0] + args[1]];
+        return [this.getReturnValue(args)];
     };
-    // Check if our return is equivalent to adding our args
-    Add.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0] + args[1] === returns[0];
-    };
-    // Add always has a cardinality of 1
-    Add.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
+    Add.prototype.getReturnValue = function (args) {
+        return args[0] + args[1];
     };
     return Add;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
 var Subtract = (function (_super) {
     __extends(Subtract, _super);
     function Subtract() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    // subtract proposes the subtractition of its args as its value for the
-    // proposed variable.
-    Subtract.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [args[0] - args[1]];
-    };
-    // Check if our return is equivalent to subtracting our args
-    Subtract.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0] - args[1] === returns[0];
-    };
-    // subtract always has a cardinality of 1
-    Subtract.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
+    Subtract.prototype.getReturnValue = function (args) {
+        return args[0] - args[1];
     };
     return Subtract;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
 var Multiply = (function (_super) {
     __extends(Multiply, _super);
     function Multiply() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    // multiply proposes the multiplyition of its args as its value for the
-    // proposed variable.
-    Multiply.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [args[0] * args[1]];
-    };
-    // Check if our return is equivalent to multiplying our args
-    Multiply.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0] * args[1] === returns[0];
-    };
-    // multiply always has a cardinality of 1
-    Multiply.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
+    Multiply.prototype.getReturnValue = function (args) {
+        return args[0] * args[1];
     };
     return Multiply;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
 var Divide = (function (_super) {
     __extends(Divide, _super);
     function Divide() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    // divide proposes the divideition of its args as its value for the
-    // proposed variable.
     Divide.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
-        return [args[0] / args[1]];
+        //Handle divide by zero
+        if (args[1] === 0) {
+            return [];
+        }
+        ;
+        return [this.getReturnValue(args)];
     };
-    // Check if our return is equivalent to divideing our args
-    Divide.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0] / args[1] === returns[0];
-    };
-    // divide always has a cardinality of 1
-    Divide.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
+    Divide.prototype.getReturnValue = function (args) {
+        if (args[1] === 0) {
+            return;
+        }
+        ;
+        return args[0] / args[1];
     };
     return Divide;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
 var Sin = (function (_super) {
     __extends(Sin, _super);
     function Sin() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Sin.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.sin(args[0] * (Math.PI / 180))];
-    };
-    Sin.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.sin(args[0] * (Math.PI / 180)) === returns[0];
-    };
-    Sin.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Sin.AttributeMapping = {
-        "angle": 0,
+    Sin.prototype.getReturnValue = function (args) {
+        return Math.sin(this.resolveTrigAttributes(args));
     };
     return Sin;
-}(join_1.Constraint));
-var Log = (function (_super) {
-    __extends(Log, _super);
-    function Log() {
-        _super.apply(this, arguments);
-    }
-    // log proposes the log of its arg as its value for the proposed variable.
-    Log.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.log(args[0]) / Math.log(10)];
-    };
-    // Check if our return is equivalent to multiplying our args
-    Log.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.log(args[0]) / Math.log(10) === returns[0];
-    };
-    // multiply always has a cardinality of 1
-    Log.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Log.AttributeMapping = {
-        "value": 0,
-    };
-    return Log;
-}(join_1.Constraint));
-var Pow = (function (_super) {
-    __extends(Pow, _super);
-    function Pow() {
-        _super.apply(this, arguments);
-    }
-    // log proposes the log of its arg as its value for the proposed variable.
-    Pow.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.pow(args[1], args[0])];
-    };
-    // Check if our return is equivalent to multiplying our args
-    Pow.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.pow(args[1], args[0]) === returns[0];
-    };
-    // multiply always has a cardinality of 1
-    Pow.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Pow.AttributeMapping = {
-        "value": 0,
-        "by": 1,
-    };
-    return Pow;
-}(join_1.Constraint));
-var Mod = (function (_super) {
-    __extends(Mod, _super);
-    function Mod() {
-        _super.apply(this, arguments);
-    }
-    Mod.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [args[0] % args[1]];
-    };
-    Mod.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0] % args[1] === returns[0];
-    };
-    Mod.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Mod.AttributeMapping = {
-        "value": 0,
-        "by": 1,
-    };
-    return Mod;
-}(join_1.Constraint));
-var Abs = (function (_super) {
-    __extends(Abs, _super);
-    function Abs() {
-        _super.apply(this, arguments);
-    }
-    Abs.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.abs(args[0])];
-    };
-    Abs.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.abs(args[0]) === returns[0];
-    };
-    Abs.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Abs.AttributeMapping = {
-        "value": 0,
-    };
-    return Abs;
-}(join_1.Constraint));
-var Floor = (function (_super) {
-    __extends(Floor, _super);
-    function Floor() {
-        _super.apply(this, arguments);
-    }
-    Floor.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.floor(args[0])];
-    };
-    Floor.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.floor(args[0]) === returns[0];
-    };
-    Floor.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Floor.AttributeMapping = {
-        "value": 0,
-    };
-    return Floor;
-}(join_1.Constraint));
-var Ceiling = (function (_super) {
-    __extends(Ceiling, _super);
-    function Ceiling() {
-        _super.apply(this, arguments);
-    }
-    Ceiling.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.ceil(args[0])];
-    };
-    Ceiling.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.ceil(args[0]) === returns[0];
-    };
-    Ceiling.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Ceiling.AttributeMapping = {
-        "value": 0,
-    };
-    return Ceiling;
-}(join_1.Constraint));
+}(TrigConstraint));
 var Cos = (function (_super) {
     __extends(Cos, _super);
     function Cos() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Cos.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.cos(args[0] * (Math.PI / 180))];
-    };
-    Cos.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.cos(args[0] * (Math.PI / 180)) === returns[0];
-    };
-    Cos.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Cos.AttributeMapping = {
-        "angle": 0,
+    Cos.prototype.getReturnValue = function (args) {
+        return Math.cos(this.resolveTrigAttributes(args));
     };
     return Cos;
-}(join_1.Constraint));
+}(TrigConstraint));
+var Tan = (function (_super) {
+    __extends(Tan, _super);
+    function Tan() {
+        return _super.apply(this, arguments) || this;
+    }
+    Tan.prototype.getReturnValue = function (args) {
+        return Math.tan(this.resolveTrigAttributes(args));
+    };
+    return Tan;
+}(TrigConstraint));
+var ASin = (function (_super) {
+    __extends(ASin, _super);
+    function ASin() {
+        return _super.apply(this, arguments) || this;
+    }
+    ASin.prototype.getReturnValue = function (args) {
+        return Math.asin(args[0]);
+    };
+    return ASin;
+}(ValueOnlyConstraint));
+var ACos = (function (_super) {
+    __extends(ACos, _super);
+    function ACos() {
+        return _super.apply(this, arguments) || this;
+    }
+    ACos.prototype.getReturnValue = function (args) {
+        return Math.acos(args[0]);
+    };
+    return ACos;
+}(ValueOnlyConstraint));
+var ATan = (function (_super) {
+    __extends(ATan, _super);
+    function ATan() {
+        return _super.apply(this, arguments) || this;
+    }
+    ATan.prototype.getReturnValue = function (args) {
+        return Math.atan(args[0]);
+    };
+    return ATan;
+}(ValueOnlyConstraint));
+var ATan2 = (function (_super) {
+    __extends(ATan2, _super);
+    function ATan2() {
+        return _super.apply(this, arguments) || this;
+    }
+    ATan2.prototype.getReturnValue = function (args) {
+        return (Math.atan2(args[0], args[1]));
+    };
+    return ATan2;
+}(TotalFunctionConstraint));
+ATan2.AttributeMapping = {
+    "x": 0,
+    "y": 1
+};
+//Hyperbolic Functions
+var SinH = (function (_super) {
+    __extends(SinH, _super);
+    function SinH() {
+        return _super.apply(this, arguments) || this;
+    }
+    SinH.prototype.sinh = function (x) {
+        var y = Math.exp(x);
+        return (y - 1 / y) / 2;
+    };
+    SinH.prototype.getReturnValue = function (args) {
+        return (this.sinh(args[0]));
+    };
+    return SinH;
+}(ValueOnlyConstraint));
+var CosH = (function (_super) {
+    __extends(CosH, _super);
+    function CosH() {
+        return _super.apply(this, arguments) || this;
+    }
+    CosH.prototype.cosh = function (x) {
+        var y = Math.exp(x);
+        return (y + 1 / y) / 2;
+    };
+    CosH.prototype.getReturnValue = function (args) {
+        return (this.cosh(args[0]));
+    };
+    return CosH;
+}(ValueOnlyConstraint));
+var TanH = (function (_super) {
+    __extends(TanH, _super);
+    function TanH() {
+        return _super.apply(this, arguments) || this;
+    }
+    TanH.prototype.tanh = function (x) {
+        if (x === Infinity) {
+            return 1;
+        }
+        else if (x === -Infinity) {
+            return -1;
+        }
+        else {
+            var y = Math.exp(2 * x);
+            return (y - 1) / (y + 1);
+        }
+    };
+    TanH.prototype.getReturnValue = function (args) {
+        return (this.tanh(args[0]));
+    };
+    return TanH;
+}(ValueOnlyConstraint));
+//Inverse Hyperbolic
+var ASinH = (function (_super) {
+    __extends(ASinH, _super);
+    function ASinH() {
+        return _super.apply(this, arguments) || this;
+    }
+    ASinH.prototype.asinh = function (x) {
+        if (x === -Infinity) {
+            return x;
+        }
+        else {
+            return Math.log(x + Math.sqrt(x * x + 1));
+        }
+    };
+    ASinH.prototype.getReturnValue = function (args) {
+        return this.asinh(args[0]);
+    };
+    return ASinH;
+}(ValueOnlyConstraint));
+var ACosH = (function (_super) {
+    __extends(ACosH, _super);
+    function ACosH() {
+        return _super.apply(this, arguments) || this;
+    }
+    ACosH.prototype.acosh = function (x) {
+        //How do we handle number outside of range in Eve? 
+        if (x < 1) {
+            return NaN;
+        }
+        return Math.log(x + Math.sqrt(x * x - 1));
+    };
+    ACosH.prototype.getReturnValue = function (args) {
+        return this.acosh(args[0]);
+    };
+    return ACosH;
+}(ValueOnlyConstraint));
+var ATanH = (function (_super) {
+    __extends(ATanH, _super);
+    function ATanH() {
+        return _super.apply(this, arguments) || this;
+    }
+    ATanH.prototype.atanh = function (x) {
+        //How do we handle number outside of range in Eve? 
+        if (Math.abs(x) > 1) {
+            return NaN;
+        }
+        return Math.log((1 + x) / (1 - x)) / 2;
+    };
+    ATanH.prototype.getReturnValue = function (args) {
+        return this.atanh(args[0]);
+    };
+    return ATanH;
+}(ValueOnlyConstraint));
+var Log = (function (_super) {
+    __extends(Log, _super);
+    function Log() {
+        return _super.apply(this, arguments) || this;
+    }
+    Log.prototype.getReturnValue = function (args) {
+        var baselog = 1;
+        if (!(isNaN(args[1]))) {
+            baselog = Math.log(args[1]);
+        }
+        return (Math.log(args[0]) / baselog);
+    };
+    return Log;
+}(TotalFunctionConstraint));
+Log.AttributeMapping = {
+    "value": 0,
+    "base": 1
+};
+var Exp = (function (_super) {
+    __extends(Exp, _super);
+    function Exp() {
+        return _super.apply(this, arguments) || this;
+    }
+    Exp.prototype.getReturnValue = function (args) {
+        return (Math.exp(args[0]));
+    };
+    return Exp;
+}(ValueOnlyConstraint));
+var Pow = (function (_super) {
+    __extends(Pow, _super);
+    function Pow() {
+        return _super.apply(this, arguments) || this;
+    }
+    Pow.prototype.getReturnValue = function (args) {
+        return Math.pow(args[0], args[1]);
+    };
+    return Pow;
+}(TotalFunctionConstraint));
+Pow.AttributeMapping = {
+    "value": 0,
+    "by": 1,
+};
+var Mod = (function (_super) {
+    __extends(Mod, _super);
+    function Mod() {
+        return _super.apply(this, arguments) || this;
+    }
+    Mod.prototype.getReturnValue = function (args) {
+        return args[0] % args[1];
+    };
+    return Mod;
+}(TotalFunctionConstraint));
+Mod.AttributeMapping = {
+    "value": 0,
+    "by": 1,
+};
+var Abs = (function (_super) {
+    __extends(Abs, _super);
+    function Abs() {
+        return _super.apply(this, arguments) || this;
+    }
+    Abs.prototype.getReturnValue = function (args) {
+        return Math.abs(args[0]);
+    };
+    return Abs;
+}(ValueOnlyConstraint));
+var Floor = (function (_super) {
+    __extends(Floor, _super);
+    function Floor() {
+        return _super.apply(this, arguments) || this;
+    }
+    Floor.prototype.getReturnValue = function (args) {
+        return Math.floor(args[0]);
+    };
+    return Floor;
+}(ValueOnlyConstraint));
+var Ceiling = (function (_super) {
+    __extends(Ceiling, _super);
+    function Ceiling() {
+        return _super.apply(this, arguments) || this;
+    }
+    Ceiling.prototype.getReturnValue = function (args) {
+        return Math.ceil(args[0]);
+    };
+    return Ceiling;
+}(ValueOnlyConstraint));
 var Random = (function (_super) {
     __extends(Random, _super);
     function Random() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Random.prototype.getRandom = function (seed) {
+    Random.prototype.getReturnValue = function (args) {
+        var seed = args[0];
         var found = Random.cache[seed];
         if (found)
             return found;
         return Random.cache[seed] = Math.random();
     };
-    Random.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [this.getRandom(args[0])];
-    };
-    Random.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return this.getRandom(args[0]) === returns[0];
-    };
-    Random.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Random.AttributeMapping = {
-        "seed": 0,
-    };
-    Random.cache = {};
     return Random;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
+Random.AttributeMapping = {
+    "seed": 0,
+};
+Random.cache = {};
 var Gaussian = (function (_super) {
     __extends(Gaussian, _super);
     function Gaussian() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Gaussian.prototype.getRandom = function (seed, sigma, mu) {
+    Gaussian.prototype.getReturnValue = function (args) {
+        var seed = args[0], sigma = args[1], mu = args[2];
         if (sigma === undefined)
             sigma = 1.0;
         if (mu === undefined)
             mu = 0.0;
-        var found = Random.cache[seed];
+        var key = "" + seed + sigma + mu;
+        var found = Gaussian.cache[key];
         if (found)
             return found;
         var u1 = Math.random();
         var u2 = Math.random();
         var z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(Math.PI * 2 * u2);
-        var key = "" + seed + sigma + mu;
         var res = z0 * sigma + mu;
-        Random.cache[key] = res;
+        Gaussian.cache[key] = res;
         return res;
     };
-    Gaussian.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [this.getRandom(args[0], args[1], args[2])];
-    };
-    Gaussian.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return this.getRandom(args[0], args[1], args[2]) === returns[0];
-    };
-    Gaussian.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Gaussian.AttributeMapping = {
-        "seed": 0,
-        "σ": 1,
-        "μ": 2
-    };
-    Gaussian.cache = {};
     return Gaussian;
-}(join_1.Constraint));
+}(TotalFunctionConstraint));
+Gaussian.AttributeMapping = {
+    "seed": 0,
+    "σ": 1,
+    "μ": 2
+};
+Gaussian.cache = {};
+var Round = (function (_super) {
+    __extends(Round, _super);
+    function Round() {
+        return _super.apply(this, arguments) || this;
+    }
+    Round.prototype.getReturnValue = function (args) {
+        return Math.round(args[0]);
+    };
+    return Round;
+}(ValueOnlyConstraint));
+var Fix = (function (_super) {
+    __extends(Fix, _super);
+    function Fix() {
+        return _super.apply(this, arguments) || this;
+    }
+    Fix.prototype.getReturnValue = function (args) {
+        var x = args[0];
+        return x - x % 1;
+    };
+    return Fix;
+}(ValueOnlyConstraint));
+var ToFixed = (function (_super) {
+    __extends(ToFixed, _super);
+    function ToFixed() {
+        return _super.apply(this, arguments) || this;
+    }
+    ToFixed.prototype.getReturnValue = function (args) {
+        return args[0].toFixed(args[1]);
+    };
+    return ToFixed;
+}(TotalFunctionConstraint));
+ToFixed.AttributeMapping = {
+    "value": 0,
+    "places": 1,
+};
 var Range = (function (_super) {
     __extends(Range, _super);
     function Range() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Range.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -431,69 +526,115 @@ var Range = (function (_super) {
         proposal.cardinality = Math.ceil(Math.abs((to - from + 1) / increment));
         return proposal;
     };
-    Range.AttributeMapping = {
-        "from": 0,
-        "to": 1,
-        "increment": 2,
-    };
     return Range;
 }(join_1.Constraint));
-var Round = (function (_super) {
-    __extends(Round, _super);
-    function Round() {
-        _super.apply(this, arguments);
+Range.AttributeMapping = {
+    "from": 0,
+    "to": 1,
+    "increment": 2,
+};
+//Constants
+var PI = (function (_super) {
+    __extends(PI, _super);
+    function PI() {
+        return _super.apply(this, arguments) || this;
     }
-    Round.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [Math.round(args[0])];
+    PI.prototype.getReturnValue = function (args) {
+        return Math.PI;
     };
-    Round.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return Math.round(args[0]) === returns[0];
-    };
-    Round.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    Round.AttributeMapping = {
-        "value": 0,
-    };
-    return Round;
-}(join_1.Constraint));
-var ToFixed = (function (_super) {
-    __extends(ToFixed, _super);
-    function ToFixed() {
-        _super.apply(this, arguments);
+    return PI;
+}(TotalFunctionConstraint));
+var E = (function (_super) {
+    __extends(E, _super);
+    function E() {
+        return _super.apply(this, arguments) || this;
     }
-    ToFixed.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [args[0].toFixed(args[1])];
+    E.prototype.getReturnValue = function (args) {
+        return Math.E;
     };
-    ToFixed.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args[0].toFixed(args[1]) === returns[0];
+    return E;
+}(TotalFunctionConstraint));
+var LN2 = (function (_super) {
+    __extends(LN2, _super);
+    function LN2() {
+        return _super.apply(this, arguments) || this;
+    }
+    LN2.prototype.getReturnValue = function (args) {
+        return Math.LN2;
     };
-    ToFixed.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
+    return LN2;
+}(TotalFunctionConstraint));
+var LN10 = (function (_super) {
+    __extends(LN10, _super);
+    function LN10() {
+        return _super.apply(this, arguments) || this;
+    }
+    LN10.prototype.getReturnValue = function (args) {
+        return Math.LN10;
     };
-    ToFixed.AttributeMapping = {
-        "value": 0,
-        "places": 1,
+    return LN10;
+}(TotalFunctionConstraint));
+var LOG2E = (function (_super) {
+    __extends(LOG2E, _super);
+    function LOG2E() {
+        return _super.apply(this, arguments) || this;
+    }
+    LOG2E.prototype.getReturnValue = function (args) {
+        return Math.LOG2E;
     };
-    return ToFixed;
-}(join_1.Constraint));
+    return LOG2E;
+}(TotalFunctionConstraint));
+var LOG10E = (function (_super) {
+    __extends(LOG10E, _super);
+    function LOG10E() {
+        return _super.apply(this, arguments) || this;
+    }
+    LOG10E.prototype.getReturnValue = function (args) {
+        return Math.LOG10E;
+    };
+    return LOG10E;
+}(TotalFunctionConstraint));
+var SQRT1_2 = (function (_super) {
+    __extends(SQRT1_2, _super);
+    function SQRT1_2() {
+        return _super.apply(this, arguments) || this;
+    }
+    SQRT1_2.prototype.getReturnValue = function (args) {
+        return Math.SQRT1_2;
+    };
+    return SQRT1_2;
+}(TotalFunctionConstraint));
+var SQRT2 = (function (_super) {
+    __extends(SQRT2, _super);
+    function SQRT2() {
+        return _super.apply(this, arguments) || this;
+    }
+    SQRT2.prototype.getReturnValue = function (args) {
+        return Math.SQRT2;
+    };
+    return SQRT2;
+}(TotalFunctionConstraint));
 providers.provide("+", Add);
 providers.provide("-", Subtract);
 providers.provide("*", Multiply);
 providers.provide("/", Divide);
-providers.provide("sin", Sin);
 providers.provide("log", Log);
+providers.provide("exp", Exp);
+//Trig and Inverse Trig
+providers.provide("sin", Sin);
 providers.provide("cos", Cos);
+providers.provide("tan", Tan);
+providers.provide("asin", ASin);
+providers.provide("acos", ACos);
+providers.provide("atan", ATan);
+providers.provide("atan2", ATan2);
+//Hyperbolic Functions.
+providers.provide("sinh", SinH);
+providers.provide("cosh", CosH);
+providers.provide("tanh", TanH);
+providers.provide("asinh", ASinH);
+providers.provide("acosh", ACosH);
+providers.provide("atanh", ATanH);
 providers.provide("floor", Floor);
 providers.provide("ceiling", Ceiling);
 providers.provide("abs", Abs);
@@ -502,6 +643,16 @@ providers.provide("pow", Pow);
 providers.provide("random", Random);
 providers.provide("range", Range);
 providers.provide("round", Round);
+providers.provide("fix", Fix);
 providers.provide("gaussian", Gaussian);
 providers.provide("to-fixed", ToFixed);
+//Constants
+providers.provide("pi", PI);
+providers.provide("e", E);
+providers.provide("ln2", LN2);
+providers.provide("ln10", LN10);
+providers.provide("log2e", LOG2E);
+providers.provide("log10e", LOG10E);
+providers.provide("sqrt1/2", SQRT1_2);
+providers.provide("sqrt2", SQRT2);
 //# sourceMappingURL=math.js.map

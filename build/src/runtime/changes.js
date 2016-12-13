@@ -6,12 +6,12 @@ var perf = global["perf"];
 //---------------------------------------------------------------------
 // ChangeType
 //---------------------------------------------------------------------
+var ChangeType;
 (function (ChangeType) {
     ChangeType[ChangeType["ADDED"] = 0] = "ADDED";
     ChangeType[ChangeType["REMOVED"] = 1] = "REMOVED";
     ChangeType[ChangeType["ADDED_REMOVED"] = 2] = "ADDED_REMOVED";
-})(exports.ChangeType || (exports.ChangeType = {}));
-var ChangeType = exports.ChangeType;
+})(ChangeType = exports.ChangeType || (exports.ChangeType = {}));
 //---------------------------------------------------------------------
 // ChangesIndex
 //---------------------------------------------------------------------

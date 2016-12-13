@@ -14,7 +14,7 @@ var httpRequest = require("request");
 var HttpDatabase = (function (_super) {
     __extends(HttpDatabase, _super);
     function HttpDatabase() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     HttpDatabase.prototype.sendRequest = function (evaluation, requestId, request) {
         var _this = this;
@@ -68,7 +68,7 @@ var HttpDatabase = (function (_super) {
                 if (index.lookup(e, "tag", "request") && !index.lookup(e, "tag", "sent")) {
                     var request = index.asObject(e);
                     if (request.url) {
-                        actions.push(new actions_1.InsertAction(e, "tag", "sent", undefined, [name]));
+                        actions.push(new actions_1.InsertAction("http|sender", e, "tag", "sent", undefined, [name]));
                         this.sendRequest(evaluation, e, request);
                     }
                 }

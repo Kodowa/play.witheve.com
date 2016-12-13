@@ -44,7 +44,7 @@ var Index = (function () {
 var IndexList = (function (_super) {
     __extends(IndexList, _super);
     function IndexList() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     IndexList.prototype.insert = function (key, value) {
         if (!this.index[key] || this.index[key].indexOf(value) === -1) {
@@ -78,7 +78,7 @@ exports.IndexList = IndexList;
 var IndexScalar = (function (_super) {
     __extends(IndexScalar, _super);
     function IndexScalar() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     IndexScalar.prototype.insert = function (key, value) {
         if (this.index[key] === undefined) {

@@ -49,7 +49,7 @@ function debounce(fn, wait, leading) {
         debounced = function () {
             var argList = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                argList[_i - 0] = arguments[_i];
+                argList[_i] = arguments[_i];
             }
             context = this;
             args = argList;
@@ -63,7 +63,7 @@ function debounce(fn, wait, leading) {
         debounced = function () {
             var argList = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                argList[_i - 0] = arguments[_i];
+                argList[_i] = arguments[_i];
             }
             context = this;
             args = argList;
@@ -180,4 +180,62 @@ function whollyEnclosed(inner, outer) {
     return (left === 1 || left === 0) && (right === -1 || right === 0);
 }
 exports.whollyEnclosed = whollyEnclosed;
+//---------------------------------------------------------
+// Net utilities
+//---------------------------------------------------------
+function dasherize(text) {
+    if (text[0] === "/")
+        text = text.slice(1);
+    return text.replace(/\//g, "-");
+}
+exports.dasherize = dasherize;
+function gistIdFromUrl(url) {
+    if (url.indexOf("gist.github.com") !== -1 ||
+        url.indexOf("gist.githubusercontent.com"))
+        return url.split("/").pop();
+}
+function writeToGist(name, content, callback) {
+    name = dasherize(name);
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function () {
+        if (request.readyState === 4) {
+            if (request.status !== 201) {
+                return callback(new Error("HTTP Response: " + request.status));
+            }
+            var response = JSON.parse(request.responseText);
+            var file = response.files[name];
+            var url = file.raw_url.split("/raw/")[0];
+            var err = (file.truncated) ? new Error("File to large: Maximum gist size is 10mb") : undefined;
+            callback(err, url);
+        }
+    };
+    var payload = {
+        public: true,
+        description: "",
+        files: {}
+    };
+    payload.files[name] = { content: content };
+    request.open("POST", "https://api.github.com/gists");
+    request.send(JSON.stringify(payload));
+}
+exports.writeToGist = writeToGist;
+function readFromGist(url, callback) {
+    var gistId = gistIdFromUrl(url);
+    if (!gistId)
+        return callback(new Error("Invalid gist url: '" + url + "'."));
+    var apiUrl = "https://api.github.com/gists/" + gistId;
+    var request = new XMLHttpRequest();
+    request.onreadystatechange = function () {
+        if (request.readyState === 4) {
+            if (request.status !== 200) {
+                return callback(new Error("HTTP Response: " + request.status));
+            }
+            var response = JSON.parse(request.responseText);
+            callback(undefined, response);
+        }
+    };
+    request.open("GET", apiUrl);
+    request.send();
+}
+exports.readFromGist = readFromGist;
 //# sourceMappingURL=util.js.map

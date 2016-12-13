@@ -31,19 +31,216 @@ exports.activeIds = {};
 // root will get added to the dom by the program microReact element in renderEditor
 exports.activeElements = { "root": document.createElement("div") };
 exports.activeElements.root.className = "program";
-var supportedTags = {
-    "div": true, "span": true, "input": true, "ul": true, "li": true, "label": true, "button": true, "header": true, "footer": true, "a": true, "strong": true,
-    "h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
-    "ol": true, "p": true, "pre": true, "em": true, "img": true, "canvas": true, "script": true, "style": true, "video": true,
-    "table": true, "tbody": true, "thead": true, "tr": true, "th": true, "td": true,
-    "form": true, "optgroup": true, "option": true, "select": true, "textarea": true,
-    "title": true, "meta": true, "link": true,
-    "svg": true, "circle": true, "line": true, "rect": true, "polygon": true, "text": true, "image": true, "defs": true, "pattern": true, "linearGradient": true, "g": true, "path": true
-};
-var svgs = { "svg": true, "circle": true, "line": true, "rect": true, "polygon": true, "text": true, "image": true, "defs": true, "pattern": true, "linearGradient": true, "g": true, "path": true };
+// Obtained from http://w3c.github.io/html-reference/elements.html
+var supportedTagsArr = [
+    "a",
+    "abbr",
+    "address",
+    "area",
+    "article",
+    "aside",
+    "audio",
+    "b",
+    "base",
+    "bdi",
+    "bdo",
+    "blockquote",
+    "body",
+    "br",
+    "button",
+    "canvas",
+    "caption",
+    "cite",
+    "code",
+    "col",
+    "colgroup",
+    "command",
+    "datalist",
+    "dd",
+    "del",
+    "details",
+    "dfn",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "embed",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "header",
+    "hgroup",
+    "hr",
+    "html",
+    "i",
+    "iframe",
+    "img",
+    "input",
+    "ins",
+    "kbd",
+    "keygen",
+    "label",
+    "legend",
+    "li",
+    "link",
+    "map",
+    "mark",
+    "menu",
+    "meta",
+    "meter",
+    "nav",
+    "noscript",
+    "object",
+    "ol",
+    "optgroup",
+    "option",
+    "output",
+    "p",
+    "param",
+    "pre",
+    "progress",
+    "q",
+    "rp",
+    "rt",
+    "ruby",
+    "s",
+    "samp",
+    "script",
+    "section",
+    "select",
+    "small",
+    "source",
+    "span",
+    "strong",
+    "style",
+    "sub",
+    "summary",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "textarea",
+    "tfoot",
+    "th",
+    "thead",
+    "time",
+    "title",
+    "tr",
+    "track",
+    "u",
+    "ul",
+    "var",
+    "video",
+    "wbr"
+];
+// Obtained from https://www.w3.org/TR/SVG/eltindex.html
+var svgsArr = [
+    // we can't have tags in both the html set and the svg set
+    // "a",
+    "altGlyph",
+    "altGlyphDef",
+    "altGlyphItem",
+    "animate",
+    "animateColor",
+    "animateMotion",
+    "animateTransform",
+    "circle",
+    "clipPath",
+    "color-profile",
+    "cursor",
+    "defs",
+    "desc",
+    "ellipse",
+    "feBlend",
+    "feColorMatrix",
+    "feComponentTransfer",
+    "feComposite",
+    "feConvolveMatrix",
+    "feDiffuseLighting",
+    "feDisplacementMap",
+    "feDistantLight",
+    "feFlood",
+    "feFuncA",
+    "feFuncB",
+    "feFuncG",
+    "feFuncR",
+    "feGaussianBlur",
+    "feImage",
+    "feMerge",
+    "feMergeNode",
+    "feMorphology",
+    "feOffset",
+    "fePointLight",
+    "feSpecularLighting",
+    "feSpotLight",
+    "feTile",
+    "feTurbulence",
+    "filter",
+    "font",
+    "font-face",
+    "font-face-format",
+    "font-face-name",
+    "font-face-src",
+    "font-face-uri",
+    "foreignObject",
+    "g",
+    "glyph",
+    "glyphRef",
+    "hkern",
+    "image",
+    "line",
+    "linearGradient",
+    "marker",
+    "mask",
+    "metadata",
+    "missing-glyph",
+    "mpath",
+    "path",
+    "pattern",
+    "polygon",
+    "polyline",
+    "radialGradient",
+    "rect",
+    "script",
+    "set",
+    "stop",
+    "style",
+    "svg",
+    "switch",
+    "symbol",
+    "text",
+    "textPath",
+    "title",
+    "tref",
+    "tspan",
+    "use",
+    "view",
+    "vkern"
+];
+supportedTagsArr.push.apply(supportedTagsArr, svgsArr);
+function toKeys(arr) {
+    var obj = {};
+    for (var _i = 0, arr_1 = arr; _i < arr_1.length; _i++) {
+        var el = arr_1[_i];
+        obj[el] = true;
+    }
+    return obj;
+}
+var supportedTags = toKeys(supportedTagsArr);
+var svgs = toKeys(svgsArr);
 // Map of input entities to a queue of their values which originated from the client and have not been received from the server yet.
 var lastFocusPath = null;
 var selectableTypes = { "": true, undefined: true, text: true, search: true, password: true, tel: true, url: true };
+var previousCheckedRadios = {};
 function insertSorted(parent, child) {
     var current;
     for (var curIx = 0; curIx < parent.childNodes.length; curIx++) {
@@ -112,7 +309,17 @@ function renderRecords() {
                 }
                 elem.entity = entityId;
                 exports.activeElements[entityId] = elem;
-                elem.sort = entity.sort || entity["eve-auto-index"] || "";
+                if (entity.sort && entity.sort.length > 1)
+                    console.error("Unable to set 'sort' multiple times on entity", entity, entity.sort);
+                if (entity.sort !== undefined && entity.sort[0] !== undefined) {
+                    elem.sort = entity.sort[0];
+                }
+                else if (entity["eve-auto-index"] !== undefined && entity["eve-auto-index"][0] !== undefined) {
+                    elem.sort = entity["eve-auto-index"][0];
+                }
+                else {
+                    elem.sort = "";
+                }
                 if (parent_2)
                     insertSorted(parent_2, elem);
             }
@@ -127,7 +334,15 @@ function renderRecords() {
                 exports.activeElements[entityId] = elem;
                 if (entity.sort && entity.sort.length > 1)
                     console.error("Unable to set 'sort' multiple times on entity", entity, entity.sort);
-                elem.sort = (entity.sort && entity.sort[0]) || (entity["eve-auto-index"] && entity["eve-auto-index"][0]) || "";
+                if (entity.sort !== undefined && entity.sort[0] !== undefined) {
+                    elem.sort = entity.sort[0];
+                }
+                else if (entity["eve-auto-index"] !== undefined && entity["eve-auto-index"][0] !== undefined) {
+                    elem.sort = entity["eve-auto-index"][0];
+                }
+                else {
+                    elem.sort = "";
+                }
                 var parent_3 = exports.activeElements[activeChildren[entityId] || "root"];
                 if (parent_3)
                     insertSorted(parent_3, elem);
@@ -200,7 +415,7 @@ function renderRecords() {
                     console.error("Unable to set 'value' multiple times on entity", entity, JSON.stringify(value));
                 }
                 else {
-                    input.value = value[0]; // @FIXME: Should this really be setAttribute?
+                    input.setAttribute('value', value[0]);
                 }
             }
             else if (attribute === "checked") {
@@ -209,6 +424,10 @@ function renderRecords() {
                 }
                 else if (value && value[0]) {
                     elem.setAttribute("checked", "true");
+                    if (elem.getAttribute("type") == "radio") {
+                        var name = elem.getAttribute("name") || "";
+                        previousCheckedRadios[name] = entityId;
+                    }
                 }
                 else {
                     elem.removeAttribute("checked");
@@ -316,6 +535,27 @@ exports.renderRecords = renderRecords;
 //---------------------------------------------------------
 // Event bindings to forward events to the server
 //---------------------------------------------------------
+function addSVGCoods(elem, event, eveEvent) {
+    if (elem.tagName != "svg")
+        return;
+    var pt = elem.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    var coords = pt.matrixTransform(elem.getScreenCTM().inverse());
+    eveEvent.x = coords.x;
+    eveEvent.y = coords.y;
+}
+function addRootEvent(elem, event, objs) {
+    if (elem !== exports.activeElements["root"])
+        return;
+    var eveEvent = {
+        tag: objs.length === 0 ? ["click"] : ["click", "direct-target"],
+        root: true,
+        x: event.clientX,
+        y: event.clientY
+    };
+    objs.push(eveEvent);
+}
 window.addEventListener("click", function (event) {
     var target = event.target;
     var current = target;
@@ -326,14 +566,30 @@ window.addEventListener("click", function (event) {
             if (current == target) {
                 tag.push("direct-target");
             }
-            objs.push({ tag: tag, element: current.entity });
+            var eveEvent = { tag: tag, element: current.entity };
+            addSVGCoods(current, event, eveEvent);
+            objs.push(eveEvent);
         }
-        if (current === exports.activeElements["root"]) {
-            objs.push({ tag: objs.length === 0 ? ["click"] : ["click", "direct-target"], root: true });
-        }
+        addRootEvent(current, event, objs);
         current = current.parentElement;
     }
-    client_1.sendEvent(objs);
+    client_1.client.sendEvent(objs);
+    if (target.tagName === "A") {
+        var elem = target;
+        // Target location is internal, so we need to rewrite it to respect the IDE's hash segment structure.
+        if (elem.href.indexOf(location.origin) === 0) {
+            var relative = elem.href.slice(location.origin.length + 1);
+            if (relative[0] === "#")
+                relative = relative.slice(1);
+            var currentHashChunks = location.hash.split("#").slice(1);
+            var ideHash = currentHashChunks[0];
+            if (ideHash[ideHash.length - 1] === "/")
+                ideHash = ideHash.slice(0, -1);
+            var modified = "#" + ideHash + "/#" + relative;
+            location.hash = modified;
+            event.preventDefault();
+        }
+    }
 });
 window.addEventListener("dblclick", function (event) {
     var target = event.target;
@@ -345,11 +601,14 @@ window.addEventListener("dblclick", function (event) {
             if (current == target) {
                 tag.push("direct-target");
             }
-            objs.push({ tag: tag, element: current.entity });
+            var eveEvent = { tag: tag, element: current.entity };
+            addSVGCoods(current, event, eveEvent);
+            objs.push(eveEvent);
         }
+        addRootEvent(current, event, objs);
         current = current.parentElement;
     }
-    client_1.sendEvent(objs);
+    client_1.client.sendEvent(objs);
 });
 window.addEventListener("input", function (event) {
     var target = event.target;
@@ -358,14 +617,30 @@ window.addEventListener("input", function (event) {
             exports.sentInputValues[target.entity] = [];
         }
         exports.sentInputValues[target.entity].push(target.value);
-        client_1.sendEvent([{ tag: ["change"], element: target.entity, value: target.value }]);
+        client_1.client.sendEvent([{ tag: ["change"], element: target.entity, value: target.value }]);
     }
 });
 window.addEventListener("change", function (event) {
     var target = event.target;
-    if (target.tagName == "INPUT" || target.tagName == "TEXTAREA")
+    if (target.tagName == "TEXTAREA")
         return;
-    if (target.entity) {
+    if (target.tagName == "INPUT") {
+        var type = target.getAttribute("type");
+        if (type != "checkbox" && type != "radio")
+            return;
+        var tickbox = target;
+        if (!tickbox.entity)
+            return;
+        client_1.client.sendEvent([{ tag: ["change", "direct-target"], element: tickbox.entity, checked: tickbox.checked }]);
+        if (type == "radio") {
+            var name = target.getAttribute("name") || "";
+            if (name in previousCheckedRadios) {
+                var previousEntity = previousCheckedRadios[name];
+                client_1.client.sendEvent([{ tag: ["change"], element: previousEntity, checked: false }]);
+            }
+        }
+    }
+    else if (target.entity) {
         if (!exports.sentInputValues[target.entity]) {
             exports.sentInputValues[target.entity] = [];
         }
@@ -378,7 +653,7 @@ window.addEventListener("change", function (event) {
         if (target == target) {
             tag.push("direct-target");
         }
-        client_1.sendEvent([{ tag: tag, element: target.entity, value: target.value }]);
+        client_1.client.sendEvent([{ tag: tag, element: target.entity, value: target.value }]);
     }
 });
 function getFocusPath(target) {
@@ -396,7 +671,7 @@ window.addEventListener("focus", function (event) {
     var target = event.target;
     if (target.entity) {
         var objs = [{ tag: ["focus"], element: target.entity }];
-        client_1.sendEvent(objs);
+        client_1.client.sendEvent(objs);
         lastFocusPath = getFocusPath(target);
     }
 }, true);
@@ -408,7 +683,7 @@ window.addEventListener("blur", function (event) {
     var target = event.target;
     if (target.entity) {
         var objs = [{ tag: ["blur"], element: target.entity }];
-        client_1.sendEvent(objs);
+        client_1.client.sendEvent(objs);
         if (lastFocusPath) {
             var curFocusPath = getFocusPath(target);
             if (curFocusPath.length === lastFocusPath.length) {
@@ -442,7 +717,8 @@ window.addEventListener("keydown", function (event) {
         }
         current = current.parentElement;
     }
-    client_1.sendEvent(objs);
+    objs.push({ tag: ["keydown"], element: "window", key: key });
+    client_1.client.sendEvent(objs);
 });
 window.addEventListener("keyup", function (event) {
     var target = event.target;
@@ -460,7 +736,7 @@ window.addEventListener("keyup", function (event) {
         current = current.parentElement;
     }
     objs.push({ tag: ["keyup"], element: "window", key: key });
-    client_1.sendEvent(objs);
+    client_1.client.sendEvent(objs);
 });
 //---------------------------------------------------------
 // Editor Renderer

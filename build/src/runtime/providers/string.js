@@ -14,7 +14,7 @@ var providers = require("./index");
 var Concat = (function (_super) {
     __extends(Concat, _super);
     function Concat() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     // To resolve a proposal, we concatenate our resolved args
     Concat.prototype.resolveProposal = function (proposal, prefix) {
@@ -39,16 +39,17 @@ var Concat = (function (_super) {
 var Split = (function (_super) {
     __extends(Split, _super);
     function Split(id, args, returns) {
-        _super.call(this, id, args, returns);
-        if (this.returns[1] !== undefined && this.returns[0] !== undefined) {
-            this.returnType = "both";
+        var _this = _super.call(this, id, args, returns) || this;
+        if (_this.returns[1] !== undefined && _this.returns[0] !== undefined) {
+            _this.returnType = "both";
         }
-        else if (this.returns[1] !== undefined) {
-            this.returnType = "index";
+        else if (_this.returns[1] !== undefined) {
+            _this.returnType = "index";
         }
         else {
-            this.returnType = "token";
+            _this.returnType = "token";
         }
+        return _this;
     }
     Split.prototype.resolveProposal = function (proposal, prefix) {
         var returns = this.resolve(prefix).returns;
@@ -95,22 +96,22 @@ var Split = (function (_super) {
         proposal.cardinality = proposal.index.length;
         return proposal;
     };
-    Split.AttributeMapping = {
-        "text": 0,
-        "by": 1,
-    };
-    Split.ReturnMapping = {
-        "token": 0,
-        "index": 1,
-    };
     return Split;
 }(join_1.Constraint));
+Split.AttributeMapping = {
+    "text": 0,
+    "by": 1,
+};
+Split.ReturnMapping = {
+    "token": 0,
+    "index": 1,
+};
 // substring over the field 'text', with the base index being 1, inclusive, 'from' defaulting
 // to the beginning of the string, and 'to' the end
 var Substring = (function (_super) {
     __extends(Substring, _super);
     function Substring() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     // To resolve a proposal, we concatenate our resolved args
     Substring.prototype.resolveProposal = function (proposal, prefix) {
@@ -151,20 +152,20 @@ var Substring = (function (_super) {
         }
         return proposal;
     };
-    Substring.AttributeMapping = {
-        "text": 0,
-        "from": 1,
-        "to": 2,
-    };
-    Substring.ReturnMapping = {
-        "value": 0,
-    };
     return Substring;
 }(join_1.Constraint));
+Substring.AttributeMapping = {
+    "text": 0,
+    "from": 1,
+    "to": 2,
+};
+Substring.ReturnMapping = {
+    "value": 0,
+};
 var Convert = (function (_super) {
     __extends(Convert, _super);
     function Convert() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Convert.prototype.resolveProposal = function (proposal, prefix) {
         var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
@@ -222,17 +223,55 @@ var Convert = (function (_super) {
         }
         return proposal;
     };
-    Convert.AttributeMapping = {
-        "value": 0,
-        "to": 1,
-    };
-    Convert.ReturnMapping = {
-        "converted": 0,
-    };
     return Convert;
 }(join_1.Constraint));
+Convert.AttributeMapping = {
+    "value": 0,
+    "to": 1,
+};
+Convert.ReturnMapping = {
+    "converted": 0,
+};
+// Urlencode a string
+var Urlencode = (function (_super) {
+    __extends(Urlencode, _super);
+    function Urlencode() {
+        return _super.apply(this, arguments) || this;
+    }
+    // To resolve a proposal, we urlencode a text
+    Urlencode.prototype.resolveProposal = function (proposal, prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        var value = args[0];
+        var converted;
+        converted = encodeURIComponent(value);
+        return [converted];
+    };
+    Urlencode.prototype.test = function (prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        var value = args[0];
+        var converted = encodeURIComponent(value);
+        return converted === returns[0];
+    };
+    // Urlencode always returns cardinality 1
+    Urlencode.prototype.getProposal = function (tripleIndex, proposed, prefix) {
+        var proposal = this.proposalObject;
+        var args = this.resolve(prefix).args;
+        var value = args[0];
+        proposal.cardinality = 1;
+        proposal.providing = proposed;
+        return proposal;
+    };
+    return Urlencode;
+}(join_1.Constraint));
+Urlencode.AttributeMapping = {
+    "text": 0
+};
+Urlencode.ReturnMapping = {
+    "value": 0,
+};
 providers.provide("concat", Concat);
 providers.provide("split", Split);
 providers.provide("substring", Substring);
 providers.provide("convert", Convert);
+providers.provide("urlencode", Urlencode);
 //# sourceMappingURL=string.js.map

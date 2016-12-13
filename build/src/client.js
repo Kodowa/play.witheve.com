@@ -1,5 +1,6 @@
 "use strict";
 var util_1 = require("./util");
+var config_1 = require("./config");
 var renderer_1 = require("./renderer");
 var ide_1 = require("./ide");
 var browser = require("./runtime/browser");
@@ -9,23 +10,6 @@ function analyticsEvent(kind, label, value) {
     if (!ga)
         return;
     ga("send", "event", "ide", kind, label, value);
-}
-// @NOTE: Intrepid user: Please don't change this. It won't work just yet!
-window["local"] = true;
-//---------------------------------------------------------
-// Utilities
-//---------------------------------------------------------
-function safeEav(eav) {
-    if (eav[0].type == "uuid") {
-        eav[0] = "\u2991" + eav[0].value + "\u2992";
-    }
-    if (eav[1].type == "uuid") {
-        eav[1] = "\u2991" + eav[1].value + "\u2992";
-    }
-    if (eav[2].type == "uuid") {
-        eav[2] = "\u2991" + eav[2].value + "\u2992";
-    }
-    return eav;
 }
 //---------------------------------------------------------
 // Connect the websocket, send the ui code
@@ -48,7 +32,7 @@ function handleDiff(state, diff) {
     var dirty = exports.indexes.dirty;
     for (var _i = 0, _a = diff.remove; _i < _a.length; _i++) {
         var remove = _a[_i];
-        var _b = safeEav(remove), e = _b[0], a = _b[1], v = _b[2];
+        var e = remove[0], a = remove[1], v = remove[2];
         if (!records.index[e]) {
             console.error("Attempting to remove an attribute of an entity that doesn't exist: " + e);
             continue;
@@ -79,9 +63,9 @@ function handleDiff(state, diff) {
         else if (a === "value")
             entitiesWithUpdatedValues[e] = true;
     }
-    for (var _c = 0, _d = diff.insert; _c < _d.length; _c++) {
-        var insert = _d[_c];
-        var _e = safeEav(insert), e = _e[0], a = _e[1], v = _e[2];
+    for (var _b = 0, _c = diff.insert; _b < _c.length; _b++) {
+        var insert = _c[_b];
+        var e = insert[0], a = insert[1], v = insert[2];
         var entity = records.index[e];
         if (!entity) {
             entity = {};
@@ -140,37 +124,122 @@ function handleDiff(state, diff) {
 }
 var prerendering = false;
 var frameRequested = false;
-function createSocket(local) {
-    if (local === void 0) { local = false; }
-    exports.socket;
-    if (!local) {
-        // socket = new WebSocket("ws://" + window.location.host + window.location.pathname, "eve-json");
-        if (location.protocol.indexOf("https") > -1) {
-            exports.socket = new WebSocket("wss://" + window.location.host + "/ws");
-        }
-        else {
-            exports.socket = new WebSocket("ws://" + window.location.host + "/ws");
-        }
-    }
-    else {
-        exports.socket = {
-            readyState: 1,
-            send: function (json) {
-                browser.responder.handleEvent(json);
-            }
+//---------------------------------------------------------
+// EveClient
+//---------------------------------------------------------
+var EveClient = (function () {
+    function EveClient(url) {
+        var _this = this;
+        this.socketQueue = [];
+        this.localEve = false;
+        this.localControl = false;
+        this.showIDE = true;
+        var loc = url ? url : this.getUrl();
+        this.socket = new WebSocket(loc);
+        this.socket.onerror = function (event) {
+            _this.onError();
+        };
+        this.socket.onopen = function (event) {
+            _this.onOpen();
+        };
+        this.socket.onmessage = function (event) {
+            _this.onMessage(event);
+        };
+        this.socket.onclose = function (event) {
+            _this.onClose();
         };
     }
-    exports.socket.onopen = onOpen;
-    exports.socket.onclose = onClose;
-    exports.socket.onmessage = onMessage;
-    if (local) {
-        browser.init("");
-    }
-    return exports.socket;
-}
-function onMessage(msg) {
-    var data = JSON.parse(msg.data);
-    if (data.type == "result") {
+    EveClient.prototype.getUrl = function () {
+        var protocol = "ws://";
+        if (location.protocol.indexOf("https") > -1) {
+            protocol = "wss://";
+        }
+        return protocol + window.location.host + "/ws";
+    };
+    EveClient.prototype.socketSend = function (message) {
+        if (this.socket && this.socket.readyState === 1) {
+            this.socket.send(message);
+        }
+        else {
+            this.socketQueue.push(message);
+        }
+    };
+    EveClient.prototype.send = function (payload) {
+        var message = JSON.stringify(payload);
+        if (!this.localEve) {
+            this.socketSend(message);
+        }
+        else {
+            browser.responder.handleEvent(message);
+        }
+    };
+    EveClient.prototype.sendControl = function (message) {
+        if (!this.localControl) {
+            this.socketSend(message);
+        }
+        else {
+        }
+    };
+    EveClient.prototype.sendEvent = function (records) {
+        if (!records || !records.length)
+            return;
+        var eavs = [];
+        for (var _i = 0, records_1 = records; _i < records_1.length; _i++) {
+            var record = records_1[_i];
+            eavs.push.apply(eavs, recordToEAVs(record));
+        }
+        this.send({ type: "event", insert: eavs });
+    };
+    EveClient.prototype.injectNotice = function (type, message) {
+        if (this.ide) {
+            this.ide.injectNotice(type, message);
+        }
+        else {
+            if (type === "error")
+                console.error(message);
+            else if (type === "warning")
+                console.warn(message);
+            else
+                console.info(message);
+        }
+    };
+    EveClient.prototype.onError = function () {
+        this.localControl = true;
+        this.localEve = true;
+        if (!this.ide) {
+            this._initProgram({ runtimeOwner: config_1.Owner.client, controlOwner: config_1.Owner.client, withIDE: true, path: (window.location.hash || "").slice(1) || "/examples/quickstart.eve" });
+        }
+        else {
+            this.injectNotice("error", "Unexpectedly disconnected from the server. Please refresh the page.");
+        }
+    };
+    EveClient.prototype.onOpen = function () {
+        var _this = this;
+        this.socketSend(JSON.stringify({ type: "init", url: location.pathname, hash: location.hash.substring(1) }));
+        for (var _i = 0, _a = this.socketQueue; _i < _a.length; _i++) {
+            var queued = _a[_i];
+            this.socketSend(queued);
+        }
+        // ping the server so that the connection isn't overzealously
+        // closed
+        setInterval(function () {
+            _this.socketSend(JSON.stringify({ type: "ping" }));
+        }, 30000);
+    };
+    EveClient.prototype.onClose = function () {
+        this.injectNotice("warning", "The editor has lost connection to the Eve server. All changes will be made locally.");
+    };
+    EveClient.prototype.onMessage = function (event) {
+        var data = JSON.parse(event.data);
+        var handler = this["_" + data.type];
+        if (handler) {
+            handler.call(this, data);
+        }
+        else if (!this.ide || !this.ide.languageService.handleMessage(data)) {
+            console.error("Unknown client message type: " + data.type);
+        }
+    };
+    EveClient.prototype._result = function (data) {
         var state = { entities: exports.indexes.records.index, dirty: exports.indexes.dirty.index };
         handleDiff(state, data);
         var diffEntities = 0;
@@ -197,41 +266,61 @@ function onMessage(msg) {
                 renderer_1.renderEve();
             });
         }
-    }
-    else if (data.type == "initLocal") {
-        exports.socket = createSocket(true);
-        browser.init("");
-    }
-    else if (data.type == "parse") {
-        _ide.loadDocument(data.generation, data.text, data.spans, data.extraInfo); // @FIXME
-    }
-    else if (data.type == "comments") {
-        _ide.injectSpans(data.spans, data.extraInfo);
-    }
-    else if (data.type == "findNode") {
-        _ide.attachView(data.recordId, data.spanId);
-    }
-    else if (data.type == "error") {
-        _ide.injectNotice("error", data.message);
-    }
-    else if (_ide.languageService.handleMessage(data)) {
-    }
-    else {
-        console.warn("UNKNOWN MESSAGE", data);
-    }
-}
-function onOpen() {
-    console.log("Connected to eve server!");
-    initializeIDE();
-    exports.socket.send(JSON.stringify({ type: "init", url: location.pathname }));
-    onHashChange({});
-    setInterval(function () {
-        exports.socket.send("\"PING\"");
-    }, 30000);
-}
-function onClose() {
-    console.log("Disconnected from eve server!");
-}
+    };
+    EveClient.prototype._initProgram = function (data) {
+        this.localEve = data.runtimeOwner === config_1.Owner.client;
+        this.localControl = data.controlOwner === config_1.Owner.client;
+        this.showIDE = data.withIDE;
+        if (this.localEve) {
+            browser.init(data.code);
+        }
+        if (this.showIDE) {
+            var path_1 = data.path;
+            if (path_1 === undefined)
+                path_1 = location.hash && location.hash.slice(1);
+            //history.replaceState({}, "", window.location.pathname);
+            this.ide = new ide_1.IDE();
+            this.ide.local = this.localControl;
+            initIDE(this);
+            this.ide.render();
+            var found = false;
+            if (path_1 && path_1.length > 2) {
+                var currentHashChunks = path_1.split("#"); //.slice(1);
+                var docId = currentHashChunks[0];
+                if (docId && docId[docId.length - 1] === "/")
+                    docId = docId.slice(0, -1);
+                found = this.ide.loadFile(docId, data.code);
+            }
+            if (!found && data.internal) {
+                this.ide.loadFile("/examples/quickstart.eve");
+            }
+        }
+        onHashChange({});
+    };
+    EveClient.prototype._parse = function (data) {
+        if (!this.showIDE)
+            return;
+        this.ide.loadDocument(data.generation, data.text, data.spans, data.extraInfo, data.css); // @FIXME
+    };
+    EveClient.prototype._comments = function (data) {
+        if (!this.showIDE)
+            return;
+        this.ide.injectSpans(data.spans, data.extraInfo);
+    };
+    EveClient.prototype._findNode = function (data) {
+        if (!this.showIDE)
+            return;
+        this.ide.attachView(data.recordId, data.spanId);
+    };
+    EveClient.prototype._error = function (data) {
+        this.injectNotice("error", data.message);
+    };
+    return EveClient;
+}());
+exports.EveClient = EveClient;
+//---------------------------------------------------------
+// Index handlers
+//---------------------------------------------------------
 function renderOnChange(index, dirty) {
     renderer_1.renderRecords();
 }
@@ -268,8 +357,16 @@ function subscribeToTagDiff(tag, callback) {
         callback(inserts, removes, records);
     });
 }
-subscribeToTagDiff("editor", function (inserts, removes, records) { return _ide.updateActions(inserts, removes, records); });
-subscribeToTagDiff("view", function (inserts, removes, records) { return _ide.updateViews(inserts, removes, records); });
+subscribeToTagDiff("editor", function (inserts, removes, records) {
+    if (!exports.client.showIDE)
+        return;
+    exports.client.ide.updateActions(inserts, removes, records);
+});
+subscribeToTagDiff("view", function (inserts, removes, records) {
+    if (!exports.client.showIDE)
+        return;
+    exports.client.ide.updateViews(inserts, removes, records);
+});
 //---------------------------------------------------------
 // Communication helpers
 //---------------------------------------------------------
@@ -313,106 +410,96 @@ function recordToEAVs(record) {
     }
     return eavs;
 }
-function send(message) {
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify(message));
+//---------------------------------------------------------
+// Initialize an IDE
+//---------------------------------------------------------
+exports.client = new EveClient();
+function initIDE(client) {
+    var ide = client.ide;
+    ide.onChange = function (ide) {
+        var generation = ide.generation;
+        var md = ide.editor.toMarkdown();
+        console.groupCollapsed("SENT " + generation);
+        console.info(md);
+        console.groupEnd();
+        client.send({ scope: "root", type: "parse", generation: generation, code: md });
+    };
+    ide.onEval = function (ide, persist) {
+        client.send({ type: "eval", persist: persist });
+    };
+    ide.onLoadFile = function (ide, documentId, code) {
+        client.send({ type: "close" });
+        client.send({ scope: "root", type: "parse", code: code });
+        client.send({ type: "eval", persist: false });
+        var url = location.pathname + "#" + documentId;
+        var currentHashChunks = location.hash.split("#").slice(1);
+        var curId = currentHashChunks[0];
+        if (curId && curId[curId.length - 1] === "/")
+            curId = curId.slice(0, -1);
+        if (curId === documentId && currentHashChunks[1]) {
+            url += "/#" + currentHashChunks[1];
+        }
+        history.pushState({}, "", url + location.search);
+        analyticsEvent("load-document", documentId);
+    };
+    ide.onSaveDocument = function (ide, documentId, code) {
+        client.sendControl(JSON.stringify({ type: "save", path: documentId, code: code }));
+    };
+    ide.onTokenInfo = function (ide, tokenId) {
+        client.send({ type: "tokenInfo", tokenId: tokenId });
+    };
+    var cache = window["_workspaceCache"];
+    for (var workspace in cache || {}) {
+        ide.loadWorkspace(workspace, cache[workspace]);
     }
 }
-exports.send = send;
-function sendEvent(records) {
-    if (!records || !records.length)
+function changeDocument() {
+    if (!exports.client.showIDE)
         return;
-    var eavs = [];
-    for (var _i = 0, records_1 = records; _i < records_1.length; _i++) {
-        var record = records_1[_i];
-        eavs.push.apply(eavs, recordToEAVs(record));
+    var ide = exports.client.ide;
+    // @FIXME: This is not right in the non-internal case.
+    var docId = "/examples/quickstart.eve";
+    var path = location.hash && location.hash.split('?')[0].split("#")[1];
+    if (path[path.length - 1] === "/")
+        path = path.slice(0, -1);
+    if (path && path.length > 2) {
+        if (path[path.length - 1] === "/")
+            path = path.slice(0, -1);
+        docId = path;
     }
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify({ type: "event", insert: eavs }));
+    if (!docId)
+        return;
+    if (docId === ide.documentId)
+        return;
+    try {
+        ide.loadFile(docId);
     }
+    catch (err) {
+        exports.client.injectNotice("info", "Unable to load unknown file: " + docId);
+    }
+    ide.render();
 }
-exports.sendEvent = sendEvent;
 //---------------------------------------------------------
 // Handlers
 //---------------------------------------------------------
 function onHashChange(event) {
-    if (_ide.loaded)
+    if (exports.client.ide && exports.client.ide.loaded)
         changeDocument();
     var hash = window.location.hash.split("#/")[2];
-    if (hash) {
-        var segments = hash.split("/").map(function (seg, ix) {
+    var queryParam = window.location.hash.split('?')[1];
+    if (hash || queryParam) {
+        var segments = (hash || '').split("/").map(function (seg, ix) {
             return { id: util_1.uuid(), index: ix + 1, value: seg };
+        }), queries = (queryParam || '').split('&').map(function (kv) {
+            var _a = kv.split('=', 2), k = _a[0], v = _a[1];
+            return { id: util_1.uuid(), key: k, value: v };
         });
-        sendEvent([
-            { tag: "url-change", "hash-segment": segments }
+        exports.client.sendEvent([
+            { tag: "url-change", "hash-segment": segments, "query-param": queries }
         ]);
     }
 }
 window.addEventListener("hashchange", onHashChange);
-//---------------------------------------------------------
-// Initialize an IDE
-//---------------------------------------------------------
-var _ide = new ide_1.IDE();
-_ide.onChange = function (ide) {
-    var generation = ide.generation;
-    var md = ide.editor.toMarkdown();
-    console.groupCollapsed("SENT " + generation);
-    console.info(md);
-    console.groupEnd();
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify({ scope: "root", type: "parse", generation: generation, code: md }));
-    }
-};
-_ide.onEval = function (ide, persist) {
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify({ type: "eval", persist: persist }));
-    }
-};
-_ide.onLoadFile = function (ide, documentId, code) {
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify({ type: "close" }));
-        exports.socket.send(JSON.stringify({ scope: "root", type: "parse", code: code }));
-        exports.socket.send(JSON.stringify({ type: "eval", persist: false }));
-    }
-    history.pushState({}, "", location.pathname + ("#/examples/" + documentId));
-    analyticsEvent("load-document", documentId);
-};
-_ide.onTokenInfo = function (ide, tokenId) {
-    if (exports.socket && exports.socket.readyState == 1) {
-        exports.socket.send(JSON.stringify({ type: "tokenInfo", tokenId: tokenId }));
-    }
-};
-_ide.loadWorkspace("examples", window["examples"]);
-function initializeIDE() {
-    changeDocument();
-}
-function changeDocument() {
-    if (exports.socket.readyState == 1) {
-        var docId = "quickstart.eve";
-        var path = location.hash.split("#/")[1];
-        if (path) {
-            if (path[path.length - 1] === "/")
-                path = path.slice(0, -1);
-            docId = path.split("/").pop();
-        }
-        if (!docId)
-            return;
-        if (docId === _ide.documentId)
-            return;
-        try {
-            _ide.loadFile(docId);
-        }
-        catch (err) {
-            _ide.injectNotice("info", "Unable to load unknown file: " + docId);
-        }
-        _ide.render();
-    }
-    else {
-        throw new Error("Cannot initialize until connected.");
-    }
-}
-_ide.render();
-console.log(_ide);
 window.document.body.addEventListener("dragover", function (e) {
     e.preventDefault();
 });
@@ -427,5 +514,4 @@ window.document.body.addEventListener("drop", function (e) {
     e.preventDefault();
     e.stopPropagation();
 });
-createSocket(global["local"]);
 //# sourceMappingURL=client.js.map

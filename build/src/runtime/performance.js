@@ -26,9 +26,10 @@ exports.NoopPerformanceTracker = NoopPerformanceTracker;
 var PerformanceTracker = (function (_super) {
     __extends(PerformanceTracker, _super);
     function PerformanceTracker() {
-        _super.call(this);
-        this.reset();
-        this.time = exports.time;
+        var _this = _super.call(this) || this;
+        _this.reset();
+        _this.time = exports.time;
+        return _this;
     }
     PerformanceTracker.prototype.reset = function () {
         this.storeTime = 0;

@@ -1,4 +1,4 @@
-/*! chevrotain - v0.14.0 */
+/*! chevrotain - v0.18.0 */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
@@ -57,8 +57,8 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	"use strict";
 	var parser_public_1 = __webpack_require__(1);
-	var lexer_public_1 = __webpack_require__(11);
-	var tokens_public_1 = __webpack_require__(10);
+	var lexer_public_1 = __webpack_require__(9);
+	var tokens_public_1 = __webpack_require__(8);
 	var exceptions_public_1 = __webpack_require__(5);
 	var gast_public_1 = __webpack_require__(7);
 	var cache_public_1 = __webpack_require__(22);
@@ -69,20 +69,34 @@ return /******/ (function(modules) { // webpackBootstrap
 	 */
 	var API = {};
 	// semantic version
-	API.VERSION = "0.14.0";
+	API.VERSION = "0.18.0";
 	// runtime API
 	API.Parser = parser_public_1.Parser;
 	API.ParserDefinitionErrorType = parser_public_1.ParserDefinitionErrorType;
 	API.Lexer = lexer_public_1.Lexer;
 	API.LexerDefinitionErrorType = lexer_public_1.LexerDefinitionErrorType;
 	API.Token = tokens_public_1.Token;
+	API.LazyToken = tokens_public_1.LazyToken;
+	API.SimpleLazyToken = tokens_public_1.SimpleLazyToken;
+	// TODO: remove this, does not belong on the API.
 	API.VirtualToken = tokens_public_1.VirtualToken;
 	API.EOF = tokens_public_1.EOF;
 	// Tokens utilities
 	API.extendToken = tokens_public_1.extendToken;
 	API.extendLazyToken = tokens_public_1.extendLazyToken;
+	API.extendSimpleLazyToken = tokens_public_1.extendSimpleLazyToken;
 	API.tokenName = tokens_public_1.tokenName;
 	API.tokenLabel = tokens_public_1.tokenLabel;
+	API.tokenMatcher = tokens_public_1.tokenMatcher;
+	// Tokens getters
+	API.getImage = tokens_public_1.getImage;
+	API.getStartOffset = tokens_public_1.getStartOffset;
+	API.getStartLine = tokens_public_1.getStartLine;
+	API.getStartColumn = tokens_public_1.getStartColumn;
+	API.getEndOffset = tokens_public_1.getEndOffset;
+	API.getEndLine = tokens_public_1.getEndLine;
+	API.getEndColumn = tokens_public_1.getEndColumn;
+	API.getTokenConstructor = tokens_public_1.getTokenConstructor;
 	// Other Utilities
 	API.EMPTY_ALT = parser_public_1.EMPTY_ALT;
 	API.exceptions = {};
@@ -104,6 +118,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	API.gast.NonTerminal = gast_public_1.gast.NonTerminal;
 	API.gast.Terminal = gast_public_1.gast.Terminal;
 	API.gast.Rule = gast_public_1.gast.Rule;
+	API.gast.serializeGrammar = gast_public_1.gast.serializeGrammar;
+	API.gast.serializeProduction = gast_public_1.gast.serializeProduction;
 	API.interperter = {};
 	API.interperter.NextAfterTokenWalker = interpreter_1.NextAfterTokenWalker;
 	API.clearCache = cache_public_1.clearCache;
@@ -119,15 +135,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	var exceptions_public_1 = __webpack_require__(5);
 	var lang_extensions_1 = __webpack_require__(3);
 	var resolver_1 = __webpack_require__(6);
-	var checks_1 = __webpack_require__(8);
+	var checks_1 = __webpack_require__(12);
 	var utils_1 = __webpack_require__(4);
 	var follow_1 = __webpack_require__(18);
-	var tokens_public_1 = __webpack_require__(10);
+	var tokens_public_1 = __webpack_require__(8);
 	var lookahead_1 = __webpack_require__(15);
 	var gast_builder_1 = __webpack_require__(20);
 	var interpreter_1 = __webpack_require__(16);
 	var constants_1 = __webpack_require__(19);
-	var gast_1 = __webpack_require__(9);
+	var gast_public_1 = __webpack_require__(7);
+	var gast_1 = __webpack_require__(13);
+	var tokens_1 = __webpack_require__(11);
+	var serializeGrammar = gast_public_1.gast.serializeGrammar;
 	(function (ParserDefinitionErrorType) {
 	    ParserDefinitionErrorType[ParserDefinitionErrorType["INVALID_RULE_NAME"] = 0] = "INVALID_RULE_NAME";
 	    ParserDefinitionErrorType[ParserDefinitionErrorType["DUPLICATE_RULE_NAME"] = 1] = "DUPLICATE_RULE_NAME";
@@ -141,19 +160,30 @@ return /******/ (function(modules) { // webpackBootstrap
 	var ParserDefinitionErrorType = exports.ParserDefinitionErrorType;
 	var IN_RULE_RECOVERY_EXCEPTION = "InRuleRecoveryException";
 	var END_OF_FILE = new tokens_public_1.EOF();
+	END_OF_FILE.tokenType = tokens_public_1.EOF.tokenType;
 	Object.freeze(END_OF_FILE);
+	// Lookahead keys are 32Bit integers in the form
+	// ZZZZZZZZZZZZZZZZZZZZZZZZ-YYYY-XXXX
+	// XXXX -> Occurrence Index bitmap.
+	// YYYY -> DSL Method Name bitmap.
+	// ZZZZZZZZZZZZZZZZZZZZZZZZ -> Rule short Index bitmap.
+	var BITS_FOR_METHOD_IDX = 4;
+	var BITS_FOR_OCCURRENCE_IDX = 4;
 	// short string used as part of mapping keys.
-	// being short (and perhaps also being integer strings) improves the performance.
-	var OR_IDX = "1";
-	var OPTION_IDX = "2";
-	var MANY_IDX = "3";
-	var AT_LEAST_ONE_IDX = "4";
-	var MANY_SEP_IDX = "5";
-	var AT_LEAST_ONE_SEP_IDX = "6";
+	// being short improves the performance when composing KEYS for maps out of these
+	// The 4 - 7 bits (16 possible values, are reserved for the DSL method indices)
+	/* tslint:disable */
+	var OR_IDX = 1 << BITS_FOR_METHOD_IDX;
+	var OPTION_IDX = 2 << BITS_FOR_METHOD_IDX;
+	var MANY_IDX = 3 << BITS_FOR_METHOD_IDX;
+	var AT_LEAST_ONE_IDX = 4 << BITS_FOR_METHOD_IDX;
+	var MANY_SEP_IDX = 5 << BITS_FOR_METHOD_IDX;
+	var AT_LEAST_ONE_SEP_IDX = 6 << BITS_FOR_METHOD_IDX;
 	var DEFAULT_PARSER_CONFIG = Object.freeze({
 	    recoveryEnabled: false,
 	    maxLookahead: 5,
-	    ignoredIssues: {}
+	    ignoredIssues: {},
+	    dynamicTokensEnabled: false
 	});
 	var DEFAULT_RULE_CONFIG = Object.freeze({
 	    recoveryValueFunc: function () { return undefined; },
@@ -223,7 +253,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.tokensMap = undefined;
 	        this.definedRulesNames = [];
 	        this.shortRuleNameToFull = new lang_extensions_1.HashTable();
-	        this.ruleShortNameIdx = 0;
+	        this.ruleShortNameIdx = 1;
 	        /**
 	         * Only used internally for storing productions as they are built for the first time.
 	         * The final productions should be accessed from the static cache.
@@ -240,6 +270,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        if (!this.recoveryEnabled) {
 	            this.attemptInRepetitionRecovery = utils_1.NOOP;
 	        }
+	        this.dynamicTokensEnabled = utils_1.has(config, "dynamicTokensEnabled") ?
+	            config.dynamicTokensEnabled :
+	            DEFAULT_PARSER_CONFIG.dynamicTokensEnabled;
 	        this.maxLookahead = utils_1.has(config, "maxLookahead") ?
 	            config.maxLookahead :
 	            DEFAULT_PARSER_CONFIG.maxLookahead;
@@ -268,18 +301,30 @@ return /******/ (function(modules) { // webpackBootstrap
 	        else {
 	            throw new Error("'tokensMapOrArr' argument must be An Array of Token constructors or a Dictionary of Tokens.");
 	        }
+	        var allTokens = utils_1.values(this.tokensMap);
+	        var areAllStructuredTokens = utils_1.every(allTokens, function (currTokType) {
+	            return tokens_1.isSimpleTokenType(currTokType);
+	        });
+	        if (areAllStructuredTokens) {
+	            this.tokenMatcher = tokens_1.tokenStructuredMatcher;
+	            this.tokenClassIdentityFunc = tokens_1.tokenStructuredIdentity;
+	            // same IdentityFunc used in structured Mode
+	            this.tokenInstanceIdentityFunc = tokens_1.tokenStructuredIdentity;
+	        }
+	        else {
+	            this.tokenMatcher = tokens_1.tokenInstanceofMatcher;
+	            this.tokenClassIdentityFunc = tokens_1.tokenClassIdentity;
+	            this.tokenInstanceIdentityFunc = tokens_1.tokenInstanceIdentity;
+	        }
 	        // always add EOF to the tokenNames -> constructors map. it is useful to assure all the input has been
 	        // parsed with a clear error message ("expecting EOF but found ...")
-	        this.tokensMap[tokens_public_1.tokenName(tokens_public_1.EOF)] = tokens_public_1.EOF;
-	        if (cache.CLASS_TO_OR_LA_CACHE[this.className] === undefined) {
-	            cache.initLookAheadKeyCache(this.className);
-	        }
-	        this.orLookaheadKeys = cache.CLASS_TO_OR_LA_CACHE[this.className];
-	        this.manyLookaheadKeys = cache.CLASS_TO_MANY_LA_CACHE[this.className];
-	        this.manySepLookaheadKeys = cache.CLASS_TO_MANY_SEP_LA_CACHE[this.className];
-	        this.atLeastOneLookaheadKeys = cache.CLASS_TO_AT_LEAST_ONE_LA_CACHE[this.className];
-	        this.atLeastOneSepLookaheadKeys = cache.CLASS_TO_AT_LEAST_ONE_SEP_LA_CACHE[this.className];
-	        this.optionLookaheadKeys = cache.CLASS_TO_OPTION_LA_CACHE[this.className];
+	        /* tslint:disable */
+	        this.tokensMap["EOF"] = tokens_public_1.EOF;
+	        /* tslint:enable */
+	        // Because ES2015+ syntax should be supported for creating Token classes
+	        // We cannot assume that the Token classes were created using the "extendToken" utilities
+	        // Therefore we must augment the Token classes both on Lexer initialization and on Parser initialization
+	        tokens_1.augmentTokenClasses(utils_1.values(this.tokensMap));
 	    }
 	    Parser.performSelfAnalysis = function (parserInstance) {
 	        var definitionErrors = [];
@@ -367,10 +412,29 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.RULE_OCCURRENCE_STACK = [];
 	    };
 	    Parser.prototype.isAtEndOfInput = function () {
-	        return this.LA(1) instanceof tokens_public_1.EOF;
+	        return this.tokenMatcher(this.LA(1), tokens_public_1.EOF);
 	    };
 	    Parser.prototype.getGAstProductions = function () {
 	        return cache.getProductionsForClass(this.className);
+	    };
+	    // This is more than a convenience method.
+	    // It is mostly used to draw the diagrams and having this method present on the parser instance
+	    // can avoid certain situations in which the serialization logic would fail due to multiple versions of chevrotain
+	    // bundled (due to multiple prototype chains and "instanceof" usage).
+	    Parser.prototype.getSerializedGastProductions = function () {
+	        return serializeGrammar(cache.getProductionsForClass(this.className).values());
+	    };
+	    /**
+	     * @param startRuleName {string}
+	     * @param precedingInput {ISimpleTokenOrIToken[]} - The token vector up to (not including) the content assist point
+	     * @returns {ISyntacticContentAssistPath[]}
+	     */
+	    Parser.prototype.computeContentAssist = function (startRuleName, precedingInput) {
+	        var startRuleGast = cache.getProductionsForClass(this.className).get(startRuleName);
+	        if (utils_1.isUndefined(startRuleGast)) {
+	            throw Error("Rule ->" + startRuleName + "<- does not exist in this grammar.");
+	        }
+	        return interpreter_1.nextPossibleTokensAfter([startRuleGast], precedingInput, this.tokenMatcher, this.maxLookahead);
 	    };
 	    Parser.prototype.isBackTracking = function () {
 	        return !(utils_1.isEmpty(this.isBackTrackingStack));
@@ -474,6 +538,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	     *
 	     * @returns {Token} - The consumed token.
 	     */
+	    // TODO: what is the returned type? ISimpleTokenOrIToken or IToken? or || ?
 	    Parser.prototype.CONSUME1 = function (tokClass) {
 	        return this.consumeInternal(tokClass, 1);
 	    };
@@ -717,31 +782,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	     * @param {Function} [action] - The action to optionally invoke multiple times.
 	     */
 	    Parser.prototype.MANY1 = function (predicateOrAction, action) {
-	        this.manyInternal(this.MANY1, "MANY1", 1, predicateOrAction, action);
+	        this.manyInternal(this.MANY1, 1, predicateOrAction, action);
 	    };
 	    /**
 	     * @see MANY1
 	     */
 	    Parser.prototype.MANY2 = function (predicateOrAction, action) {
-	        this.manyInternal(this.MANY2, "MANY2", 2, predicateOrAction, action);
+	        this.manyInternal(this.MANY2, 2, predicateOrAction, action);
 	    };
 	    /**
 	     * @see MANY1
 	     */
 	    Parser.prototype.MANY3 = function (predicateOrAction, action) {
-	        this.manyInternal(this.MANY3, "MANY3", 3, predicateOrAction, action);
+	        this.manyInternal(this.MANY3, 3, predicateOrAction, action);
 	    };
 	    /**
 	     * @see MANY1
 	     */
 	    Parser.prototype.MANY4 = function (predicateOrAction, action) {
-	        this.manyInternal(this.MANY4, "MANY4", 4, predicateOrAction, action);
+	        this.manyInternal(this.MANY4, 4, predicateOrAction, action);
 	    };
 	    /**
 	     * @see MANY1
 	     */
 	    Parser.prototype.MANY5 = function (predicateOrAction, action) {
-	        this.manyInternal(this.MANY5, "MANY5", 5, predicateOrAction, action);
+	        this.manyInternal(this.MANY5, 5, predicateOrAction, action);
 	    };
 	    /**
 	     * Convenience method equivalent to MANY_SEP1.
@@ -775,31 +840,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	     * @return {Token[]} - The consumed separator Tokens.
 	     */
 	    Parser.prototype.MANY_SEP1 = function (separator, action) {
-	        return this.manySepFirstInternal(this.MANY_SEP1, "MANY_SEP1", 1, separator, action);
+	        return this.manySepFirstInternal(this.MANY_SEP1, 1, separator, action);
 	    };
 	    /**
 	     * @see MANY_SEP1
 	     */
 	    Parser.prototype.MANY_SEP2 = function (separator, action) {
-	        return this.manySepFirstInternal(this.MANY_SEP2, "MANY_SEP2", 2, separator, action);
+	        return this.manySepFirstInternal(this.MANY_SEP2, 2, separator, action);
 	    };
 	    /**
 	     * @see MANY_SEP1
 	     */
 	    Parser.prototype.MANY_SEP3 = function (separator, action) {
-	        return this.manySepFirstInternal(this.MANY_SEP3, "MANY_SEP3", 3, separator, action);
+	        return this.manySepFirstInternal(this.MANY_SEP3, 3, separator, action);
 	    };
 	    /**
 	     * @see MANY_SEP1
 	     */
 	    Parser.prototype.MANY_SEP4 = function (separator, action) {
-	        return this.manySepFirstInternal(this.MANY_SEP4, "MANY_SEP4", 4, separator, action);
+	        return this.manySepFirstInternal(this.MANY_SEP4, 4, separator, action);
 	    };
 	    /**
 	     * @see MANY_SEP1
 	     */
 	    Parser.prototype.MANY_SEP5 = function (separator, action) {
-	        return this.manySepFirstInternal(this.MANY_SEP5, "MANY_SEP5", 5, separator, action);
+	        return this.manySepFirstInternal(this.MANY_SEP5, 5, separator, action);
 	    };
 	    /**
 	     * Convenience method equivalent to AT_LEAST_ONE1.
@@ -821,31 +886,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	     * @param {string} [errMsg] - Short title/classification to what is being matched.
 	     */
 	    Parser.prototype.AT_LEAST_ONE1 = function (predicateOrAction, action, errMsg) {
-	        this.atLeastOneInternal(this.AT_LEAST_ONE1, "AT_LEAST_ONE1", 1, predicateOrAction, action, errMsg);
+	        this.atLeastOneInternal(this.AT_LEAST_ONE1, 1, predicateOrAction, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE1
 	     */
 	    Parser.prototype.AT_LEAST_ONE2 = function (predicateOrAction, action, errMsg) {
-	        this.atLeastOneInternal(this.AT_LEAST_ONE2, "AT_LEAST_ONE2", 2, predicateOrAction, action, errMsg);
+	        this.atLeastOneInternal(this.AT_LEAST_ONE2, 2, predicateOrAction, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE1
 	     */
 	    Parser.prototype.AT_LEAST_ONE3 = function (predicateOrAction, action, errMsg) {
-	        this.atLeastOneInternal(this.AT_LEAST_ONE3, "AT_LEAST_ONE3", 3, predicateOrAction, action, errMsg);
+	        this.atLeastOneInternal(this.AT_LEAST_ONE3, 3, predicateOrAction, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE1
 	     */
 	    Parser.prototype.AT_LEAST_ONE4 = function (predicateOrAction, action, errMsg) {
-	        this.atLeastOneInternal(this.AT_LEAST_ONE4, "AT_LEAST_ONE4", 4, predicateOrAction, action, errMsg);
+	        this.atLeastOneInternal(this.AT_LEAST_ONE4, 4, predicateOrAction, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE1
 	     */
 	    Parser.prototype.AT_LEAST_ONE5 = function (predicateOrAction, action, errMsg) {
-	        this.atLeastOneInternal(this.AT_LEAST_ONE5, "AT_LEAST_ONE5", 5, predicateOrAction, action, errMsg);
+	        this.atLeastOneInternal(this.AT_LEAST_ONE5, 5, predicateOrAction, action, errMsg);
 	    };
 	    /**
 	     * Convenience method equivalent to AT_LEAST_ONE_SEP1.
@@ -867,31 +932,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	     * @param {string} [errMsg] - Short title/classification to what is being matched.
 	     */
 	    Parser.prototype.AT_LEAST_ONE_SEP1 = function (separator, action, errMsg) {
-	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, "AT_LEAST_ONE_SEP1", 1, separator, action, errMsg);
+	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, 1, separator, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE_SEP1
 	     */
 	    Parser.prototype.AT_LEAST_ONE_SEP2 = function (separator, action, errMsg) {
-	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, "AT_LEAST_ONE_SEP2", 2, separator, action, errMsg);
+	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, 2, separator, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE_SEP1
 	     */
 	    Parser.prototype.AT_LEAST_ONE_SEP3 = function (separator, action, errMsg) {
-	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, "AT_LEAST_ONE_SEP3", 3, separator, action, errMsg);
+	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, 3, separator, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE_SEP1
 	     */
 	    Parser.prototype.AT_LEAST_ONE_SEP4 = function (separator, action, errMsg) {
-	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, "AT_LEAST_ONE_SEP4", 4, separator, action, errMsg);
+	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, 4, separator, action, errMsg);
 	    };
 	    /**
 	     * @see AT_LEAST_ONE_SEP1
 	     */
 	    Parser.prototype.AT_LEAST_ONE_SEP5 = function (separator, action, errMsg) {
-	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, "AT_LEAST_ONE_SEP5", 5, separator, action, errMsg);
+	        return this.atLeastOneSepFirstInternal(this.atLeastOneSepFirstInternal, 5, separator, action, errMsg);
 	    };
 	    /**
 	     *
@@ -959,7 +1024,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.RULE_OCCURRENCE_STACK.pop();
 	        if ((this.RULE_STACK.length === 0) && !this.isAtEndOfInput()) {
 	            var firstRedundantTok = this.LA(1);
-	            this.SAVE_ERROR(new exceptions_public_1.exceptions.NotAllInputParsedException("Redundant input, expecting EOF but found: " + firstRedundantTok.image, firstRedundantTok));
+	            this.SAVE_ERROR(new exceptions_public_1.exceptions.NotAllInputParsedException("Redundant input, expecting EOF but found: " + tokens_public_1.getImage(firstRedundantTok), firstRedundantTok));
 	        }
 	    };
 	    /**
@@ -974,6 +1039,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	                orgText: "",
 	                lineToOffset: []
 	            });
+	        }
+	        else if (tokens_public_1.SimpleLazyToken.prototype.isPrototypeOf(tokClass.prototype)) {
+	            tokToInsert = {
+	                startOffset: NaN,
+	                endOffset: NaN,
+	                cacheData: {
+	                    orgText: "",
+	                    lineToOffset: []
+	                }
+	            };
 	        }/* istanbul ignore else */ 
 	        else if (tokens_public_1.Token.prototype.isPrototypeOf(tokClass.prototype)) {
 	            tokToInsert = new tokClass("", NaN, NaN, NaN, NaN, NaN);
@@ -1004,7 +1079,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var expectedMsg = hasLabel ?
 	            "--> " + tokens_public_1.tokenLabel(expectedTokType) + " <--" :
 	            "token of type --> " + tokens_public_1.tokenName(expectedTokType) + " <--";
-	        var msg = "Expecting " + expectedMsg + " but found --> '" + actualToken.image + "' <--";
+	        var msg = "Expecting " + expectedMsg + " but found --> '" + tokens_public_1.getImage(actualToken) + "' <--";
 	        return msg;
 	    };
 	    Parser.prototype.getCurrentGrammarPath = function (tokClass, tokIdxInRule) {
@@ -1058,8 +1133,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            // but the original syntax could have been parsed successfully without any backtracking + recovery
 	            if (this.recoveryEnabled &&
 	                // TODO: more robust checking of the exception type. Perhaps Typescript extending expressions?
-	                eFromConsumption.name === "MismatchedTokenException" &&
-	                !this.isBackTracking()) {
+	                eFromConsumption.name === "MismatchedTokenException" && !this.isBackTracking()) {
 	                var follows = this.getFollowsForInRuleRecovery(tokClass, idx);
 	                try {
 	                    return this.tryInRuleRecovery(tokClass, follows);
@@ -1114,6 +1188,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Parser.prototype.resetLexerState = function () {
 	        this.inputIdx = -1;
 	    };
+	    Parser.prototype.moveLexerStateToEnd = function () {
+	        this.inputIdx = this.input.length - 1;
+	    };
 	    // other functionality
 	    Parser.prototype.saveRecogState = function () {
 	        // errors is a getter which will clone the errors array
@@ -1139,7 +1216,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            DEFAULT_RULE_CONFIG.recoveryValueFunc;
 	        // performance optimization: Use small integers as keys for the longer human readable "full" rule names.
 	        // this greatly improves Map access time (as much as 8% for some performance benchmarks).
-	        var shortName = String(this.ruleShortNameIdx);
+	        /* tslint:disable */
+	        var shortName = this.ruleShortNameIdx << (BITS_FOR_METHOD_IDX + BITS_FOR_OCCURRENCE_IDX);
+	        /* tslint:enable */
 	        this.ruleShortNameIdx++;
 	        this.shortRuleNameToFull.put(shortName, ruleName);
 	        function invokeRuleNoTry(args) {
@@ -1168,13 +1247,24 @@ return /******/ (function(modules) { // webpackBootstrap
 	                // reSync with EOF and just output some INVALID ParseTree
 	                // during backtracking reSync recovery is disabled, otherwise we can't be certain the backtracking
 	                // path is really the most valid one
-	                var reSyncEnabled = isFirstInvokedRule || (resyncEnabled
-	                    && !this.isBackTracking()
-	                    && this.recoveryEnabled);
-	                if (reSyncEnabled && exceptions_public_1.exceptions.isRecognitionException(e)) {
-	                    var reSyncTokType = this.findReSyncTokenType();
-	                    if (this.isInCurrentRuleReSyncSet(reSyncTokType)) {
-	                        e.resyncedTokens = this.reSyncTo(reSyncTokType);
+	                var reSyncEnabled = resyncEnabled && !this.isBackTracking() && this.recoveryEnabled;
+	                if (exceptions_public_1.exceptions.isRecognitionException(e)) {
+	                    if (reSyncEnabled) {
+	                        var reSyncTokType = this.findReSyncTokenType();
+	                        if (this.isInCurrentRuleReSyncSet(reSyncTokType)) {
+	                            e.resyncedTokens = this.reSyncTo(reSyncTokType);
+	                            return recoveryValueFunc();
+	                        }
+	                        else {
+	                            // to be handled farther up the call stack
+	                            throw e;
+	                        }
+	                    }
+	                    else if (isFirstInvokedRule) {
+	                        // otherwise a Redundant input error will be created as well and we cannot guarantee that this is indeed the case
+	                        this.moveLexerStateToEnd();
+	                        // the parser should never throw one of its own errors outside its flow.
+	                        // even if error recovery is disabled
 	                        return recoveryValueFunc();
 	                    }
 	                    else {
@@ -1228,7 +1318,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        };
 	        while (!passedResyncPoint) {
 	            // re-synced to a point where we can safely exit the repetition/
-	            if (currToken instanceof expectedTokType) {
+	            if (this.tokenMatcher(currToken, expectedTokType)) {
 	                generateErrorMessage();
 	                return; // must return here to avoid reverting the inputIdx
 	            }
@@ -1238,7 +1328,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                grammarRule.apply(this, grammarRuleArgs);
 	                return; // must return here to avoid reverting the inputIdx
 	            }
-	            else if (currToken instanceof reSyncTokType) {
+	            else if (this.tokenMatcher(currToken, reSyncTokType)) {
 	                passedResyncPoint = true;
 	            }
 	            else {
@@ -1257,7 +1347,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return false;
 	        }
 	        // no need to recover, next token is what we expect...
-	        if (this.LA(1) instanceof expectTokAfterLastMatch) {
+	        if (this.tokenMatcher(this.LA(1), expectTokAfterLastMatch)) {
 	            return false;
 	        }
 	        // error recovery is disabled during backtracking as it can make the parser ignore a valid grammar path
@@ -1296,6 +1386,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            this.canRecoverWithSingleTokenDeletion(expectedToken);
 	    };
 	    Parser.prototype.canRecoverWithSingleTokenInsertion = function (expectedTokType, follows) {
+	        var _this = this;
 	        if (!this.canTokenTypeBeInsertedInRecovery(expectedTokType)) {
 	            return false;
 	        }
@@ -1305,18 +1396,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	        var mismatchedTok = this.LA(1);
 	        var isMisMatchedTokInFollows = utils_1.find(follows, function (possibleFollowsTokType) {
-	            return mismatchedTok instanceof possibleFollowsTokType;
+	            return _this.tokenMatcher(mismatchedTok, possibleFollowsTokType);
 	        }) !== undefined;
 	        return isMisMatchedTokInFollows;
 	    };
 	    Parser.prototype.canRecoverWithSingleTokenDeletion = function (expectedTokType) {
-	        var isNextTokenWhatIsExpected = this.LA(2) instanceof expectedTokType;
+	        var isNextTokenWhatIsExpected = this.tokenMatcher(this.LA(2), expectedTokType);
 	        return isNextTokenWhatIsExpected;
 	    };
-	    Parser.prototype.isInCurrentRuleReSyncSet = function (token) {
+	    Parser.prototype.isInCurrentRuleReSyncSet = function (tokenType) {
 	        var followKey = this.getCurrFollowKey();
 	        var currentRuleReSyncSet = this.getFollowSetFromFollowKey(followKey);
-	        return utils_1.contains(currentRuleReSyncSet, token);
+	        return utils_1.contains(currentRuleReSyncSet, tokenType);
 	    };
 	    Parser.prototype.findReSyncTokenType = function () {
 	        var allPossibleReSyncTokTypes = this.flattenFollowSet();
@@ -1324,7 +1415,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var nextToken = this.LA(1);
 	        var k = 2;
 	        while (true) {
-	            var nextTokenType = nextToken.constructor;
+	            var nextTokenType = tokens_public_1.getTokenConstructor(nextToken);
 	            if (utils_1.contains(allPossibleReSyncTokTypes, nextTokenType)) {
 	                return nextTokenType;
 	            }
@@ -1376,7 +1467,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // It does not make any sense to include a virtual EOF token in the list of resynced tokens
 	    // as EOF does not really exist and thus does not contain any useful information (line/column numbers)
 	    Parser.prototype.addToResyncTokens = function (token, resyncTokens) {
-	        if (!(token instanceof tokens_public_1.EOF)) {
+	        if (!this.tokenMatcher(token, tokens_public_1.EOF)) {
 	            resyncTokens.push(token);
 	        }
 	        return resyncTokens;
@@ -1384,15 +1475,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Parser.prototype.reSyncTo = function (tokClass) {
 	        var resyncedTokens = [];
 	        var nextTok = this.LA(1);
-	        while ((nextTok instanceof tokClass) === false) {
+	        while ((this.tokenMatcher(nextTok, tokClass)) === false) {
 	            nextTok = this.SKIP_TOKEN();
 	            this.addToResyncTokens(nextTok, resyncedTokens);
 	        }
 	        // the last token is not part of the error.
 	        return utils_1.dropRight(resyncedTokens);
 	    };
-	    Parser.prototype.attemptInRepetitionRecovery = function (prodFunc, args, lookaheadFunc, prodName, prodOccurrence, nextToksWalker, prodKeys) {
-	        var key = this.getKeyForAutomaticLookahead(prodName, prodKeys, prodOccurrence);
+	    Parser.prototype.attemptInRepetitionRecovery = function (prodFunc, args, lookaheadFunc, dslMethodIdx, prodOccurrence, nextToksWalker) {
+	        var key = this.getKeyForAutomaticLookahead(dslMethodIdx, prodOccurrence);
 	        var firstAfterRepInfo = this.firstAfterRepMap.get(key);
 	        if (firstAfterRepInfo === undefined) {
 	            var currRuleName = this.getCurrRuleFullName();
@@ -1434,7 +1525,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	        return false;
 	    };
-	    Parser.prototype.atLeastOneInternal = function (prodFunc, prodName, prodOccurrence, predicate, action, userDefinedErrMsg) {
+	    Parser.prototype.atLeastOneInternal = function (prodFunc, prodOccurrence, predicate, action, userDefinedErrMsg) {
 	        var _this = this;
 	        var lookAheadFunc = this.getLookaheadFuncForAtLeastOne(prodOccurrence);
 	        if (!utils_1.isFunction(action)) {
@@ -1461,16 +1552,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // AT_LEAST_ONE we change the grammar to AT_LEAST_TWO, AT_LEAST_THREE ... , the possible recursive call
 	        // from the tryInRepetitionRecovery(...) will only happen IFF there really are TWO/THREE/.... items.
 	        // Performance optimization: "attemptInRepetitionRecovery" will be defined as NOOP unless recovery is enabled
-	        this.attemptInRepetitionRecovery(prodFunc, [lookAheadFunc, action, userDefinedErrMsg], lookAheadFunc, prodName, prodOccurrence, interpreter_1.NextTerminalAfterAtLeastOneWalker, this.atLeastOneLookaheadKeys);
+	        this.attemptInRepetitionRecovery(prodFunc, [lookAheadFunc, action, userDefinedErrMsg], lookAheadFunc, AT_LEAST_ONE_IDX, prodOccurrence, interpreter_1.NextTerminalAfterAtLeastOneWalker);
 	    };
-	    Parser.prototype.atLeastOneSepFirstInternal = function (prodFunc, prodName, prodOccurrence, separator, action, userDefinedErrMsg) {
+	    Parser.prototype.atLeastOneSepFirstInternal = function (prodFunc, prodOccurrence, separator, action, userDefinedErrMsg) {
 	        var _this = this;
 	        var separatorsResult = [];
 	        var firstIterationLookaheadFunc = this.getLookaheadFuncForAtLeastOneSep(prodOccurrence);
 	        // 1st iteration
 	        if (firstIterationLookaheadFunc.call(this)) {
 	            action.call(this);
-	            var separatorLookAheadFunc = function () { return _this.LA(1) instanceof separator; };
+	            var separatorLookAheadFunc = function () { return _this.tokenMatcher(_this.LA(1), separator); };
 	            // 2nd..nth iterations
 	            while (separatorLookAheadFunc()) {
 	                // note that this CONSUME will never enter recovery because
@@ -1479,15 +1570,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	                action.call(this);
 	            }
 	            // Performance optimization: "attemptInRepetitionRecovery" will be defined as NOOP unless recovery is enabled
-	            this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodName, prodOccurrence, separator, separatorLookAheadFunc, action, separatorsResult,
-	                this.atLeastOneSepLookaheadKeys, interpreter_1.NextTerminalAfterAtLeastOneSepWalker], separatorLookAheadFunc, prodName, prodOccurrence, interpreter_1.NextTerminalAfterAtLeastOneSepWalker, this.atLeastOneSepLookaheadKeys);
+	            this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodOccurrence, separator, separatorLookAheadFunc,
+	                action, separatorsResult, interpreter_1.NextTerminalAfterAtLeastOneSepWalker], separatorLookAheadFunc, AT_LEAST_ONE_SEP_IDX, prodOccurrence, interpreter_1.NextTerminalAfterAtLeastOneSepWalker);
 	        }
 	        else {
 	            throw this.raiseEarlyExitException(prodOccurrence, lookahead_1.PROD_TYPE.REPETITION_MANDATORY_WITH_SEPARATOR, userDefinedErrMsg);
 	        }
 	        return separatorsResult;
 	    };
-	    Parser.prototype.manyInternal = function (prodFunc, prodName, prodOccurrence, predicate, action) {
+	    Parser.prototype.manyInternal = function (prodFunc, prodOccurrence, predicate, action) {
 	        var _this = this;
 	        var lookaheadFunction = this.getLookaheadFuncForMany(prodOccurrence);
 	        if (action === undefined) {
@@ -1504,16 +1595,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	            action.call(this);
 	        }
 	        // Performance optimization: "attemptInRepetitionRecovery" will be defined as NOOP unless recovery is enabled
-	        this.attemptInRepetitionRecovery(prodFunc, [lookaheadFunction, action], lookaheadFunction, prodName, prodOccurrence, interpreter_1.NextTerminalAfterManyWalker, this.manyLookaheadKeys);
+	        this.attemptInRepetitionRecovery(prodFunc, [lookaheadFunction, action], lookaheadFunction, MANY_IDX, prodOccurrence, interpreter_1.NextTerminalAfterManyWalker);
 	    };
-	    Parser.prototype.manySepFirstInternal = function (prodFunc, prodName, prodOccurrence, separator, action) {
+	    Parser.prototype.manySepFirstInternal = function (prodFunc, prodOccurrence, separator, action) {
 	        var _this = this;
 	        var separatorsResult = [];
 	        var firstIterationLaFunc = this.getLookaheadFuncForManySep(prodOccurrence);
 	        // 1st iteration
 	        if (firstIterationLaFunc.call(this)) {
 	            action.call(this);
-	            var separatorLookAheadFunc = function () { return _this.LA(1) instanceof separator; };
+	            var separatorLookAheadFunc = function () { return _this.tokenMatcher(_this.LA(1), separator); };
 	            // 2nd..nth iterations
 	            while (separatorLookAheadFunc()) {
 	                // note that this CONSUME will never enter recovery because
@@ -1522,12 +1613,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	                action.call(this);
 	            }
 	            // Performance optimization: "attemptInRepetitionRecovery" will be defined as NOOP unless recovery is enabled
-	            this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodName, prodOccurrence, separator, separatorLookAheadFunc, action, separatorsResult,
-	                this.manySepLookaheadKeys, interpreter_1.NextTerminalAfterManySepWalker], separatorLookAheadFunc, prodName, prodOccurrence, interpreter_1.NextTerminalAfterManySepWalker, this.manySepLookaheadKeys);
+	            this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodOccurrence, separator, separatorLookAheadFunc, action, separatorsResult, interpreter_1.NextTerminalAfterManySepWalker], separatorLookAheadFunc, MANY_SEP_IDX, prodOccurrence, interpreter_1.NextTerminalAfterManySepWalker);
 	        }
 	        return separatorsResult;
 	    };
-	    Parser.prototype.repetitionSepSecondInternal = function (prodName, prodOccurrence, separator, separatorLookAheadFunc, action, separatorsResult, laKeys, nextTerminalAfterWalker) {
+	    Parser.prototype.repetitionSepSecondInternal = function (prodOccurrence, separator, separatorLookAheadFunc, action, separatorsResult, nextTerminalAfterWalker) {
 	        while (separatorLookAheadFunc()) {
 	            // note that this CONSUME will never enter recovery because
 	            // the separatorLookAheadFunc checks that the separator really does exist.
@@ -1540,13 +1630,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // however it is kept to avoid confusion and be consistent.
 	        // Performance optimization: "attemptInRepetitionRecovery" will be defined as NOOP unless recovery is enabled
 	        /* istanbul ignore else */
-	        this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodName, prodOccurrence, separator, separatorLookAheadFunc,
-	            action, separatorsResult, laKeys, nextTerminalAfterWalker], separatorLookAheadFunc, prodName, prodOccurrence, nextTerminalAfterWalker, laKeys);
+	        this.attemptInRepetitionRecovery(this.repetitionSepSecondInternal, [prodOccurrence, separator, separatorLookAheadFunc,
+	            action, separatorsResult, nextTerminalAfterWalker], separatorLookAheadFunc, AT_LEAST_ONE_SEP_IDX, prodOccurrence, nextTerminalAfterWalker);
 	    };
 	    Parser.prototype.orInternal = function (alts, errMsgTypes, occurrence) {
 	        var laFunc = this.getLookaheadFuncForOr(occurrence, alts);
 	        var altToTake = laFunc.call(this, alts);
-	        if (altToTake !== -1) {
+	        if (altToTake !== undefined) {
 	            var chosenAlternative = alts[altToTake];
 	            return chosenAlternative.ALT.call(this);
 	        }
@@ -1555,7 +1645,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // to enable optimizations this logic has been extract to a method as its invoker contains try/catch
 	    Parser.prototype.consumeInternalOptimized = function (expectedTokClass) {
 	        var nextToken = this.LA(1);
-	        if (nextToken instanceof expectedTokClass) {
+	        if (this.tokenMatcher(nextToken, expectedTokClass)) {
 	            this.consumeToken();
 	            return nextToken;
 	        }
@@ -1564,26 +1654,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	            throw this.SAVE_ERROR(new exceptions_public_1.exceptions.MismatchedTokenException(msg, nextToken));
 	        }
 	    };
-	    Parser.prototype.getKeyForAutomaticLookahead = function (prodName, prodKeys, occurrence) {
-	        var occuMap = prodKeys[occurrence - 1];
+	    // this actually returns a number, but it is always used as a string (object prop key)
+	    Parser.prototype.getKeyForAutomaticLookahead = function (dslMethodIdx, occurrence) {
 	        var ruleStack = this.RULE_STACK;
 	        var currRuleShortName = ruleStack[ruleStack.length - 1];
-	        var key = occuMap[currRuleShortName];
-	        if (key === undefined) {
-	            key = prodName + occurrence + currRuleShortName;
-	            occuMap[currRuleShortName] = key;
-	        }
-	        return key;
+	        /* tslint:disable */
+	        return occurrence | dslMethodIdx | currRuleShortName;
+	        /* tslint:enable */
 	    };
 	    Parser.prototype.getLookaheadFuncForOr = function (occurrence, alts) {
-	        var key = this.getKeyForAutomaticLookahead(OR_IDX, this.orLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(OR_IDX, occurrence);
 	        var laFunc = this.classLAFuncs.get(key);
 	        if (laFunc === undefined) {
 	            var ruleName = this.getCurrRuleFullName();
 	            var ruleGrammar = this.getGAstProductions().get(ruleName);
 	            // note that hasPredicates is only computed once.
 	            var hasPredicates = utils_1.some(alts, function (currAlt) { return utils_1.isFunction(currAlt.GATE); });
-	            laFunc = lookahead_1.buildLookaheadFuncForOr(occurrence, ruleGrammar, this.maxLookahead, hasPredicates);
+	            laFunc = lookahead_1.buildLookaheadFuncForOr(occurrence, ruleGrammar, this.maxLookahead, hasPredicates, this.tokenMatcher, this.tokenClassIdentityFunc, this.tokenInstanceIdentityFunc, this.dynamicTokensEnabled);
 	            this.classLAFuncs.put(key, laFunc);
 	            return laFunc;
 	        }
@@ -1593,41 +1680,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	    };
 	    // Automatic lookahead calculation
 	    Parser.prototype.getLookaheadFuncForOption = function (occurrence) {
-	        var key = this.getKeyForAutomaticLookahead(OPTION_IDX, this.optionLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(OPTION_IDX, occurrence);
 	        return this.getLookaheadFuncFor(key, occurrence, lookahead_1.buildLookaheadForOption, this.maxLookahead);
 	    };
 	    Parser.prototype.getLookaheadFuncForMany = function (occurrence) {
-	        var key = this.getKeyForAutomaticLookahead(MANY_IDX, this.manyLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(MANY_IDX, occurrence);
 	        return this.getLookaheadFuncFor(key, occurrence, lookahead_1.buildLookaheadForMany, this.maxLookahead);
 	    };
 	    Parser.prototype.getLookaheadFuncForManySep = function (occurrence) {
-	        var key = this.getKeyForAutomaticLookahead(MANY_SEP_IDX, this.manySepLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(MANY_SEP_IDX, occurrence);
 	        return this.getLookaheadFuncFor(key, occurrence, lookahead_1.buildLookaheadForManySep, this.maxLookahead);
 	    };
 	    Parser.prototype.getLookaheadFuncForAtLeastOne = function (occurrence) {
-	        var key = this.getKeyForAutomaticLookahead(AT_LEAST_ONE_IDX, this.atLeastOneLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(AT_LEAST_ONE_IDX, occurrence);
 	        return this.getLookaheadFuncFor(key, occurrence, lookahead_1.buildLookaheadForAtLeastOne, this.maxLookahead);
 	    };
 	    Parser.prototype.getLookaheadFuncForAtLeastOneSep = function (occurrence) {
-	        var key = this.getKeyForAutomaticLookahead(AT_LEAST_ONE_SEP_IDX, this.atLeastOneSepLookaheadKeys, occurrence);
+	        var key = this.getKeyForAutomaticLookahead(AT_LEAST_ONE_SEP_IDX, occurrence);
 	        return this.getLookaheadFuncFor(key, occurrence, lookahead_1.buildLookaheadForAtLeastOneSep, this.maxLookahead);
-	    };
-	    Parser.prototype.getLookaheadFuncFor = function (key, occurrence, laFuncBuilder, maxLookahead) {
-	        var laFunc = this.classLAFuncs.get(key);
-	        if (laFunc === undefined) {
-	            var ruleName = this.getCurrRuleFullName();
-	            var ruleGrammar = this.getGAstProductions().get(ruleName);
-	            laFunc = laFuncBuilder.apply(null, [occurrence, ruleGrammar, maxLookahead]);
-	            this.classLAFuncs.put(key, laFunc);
-	            return laFunc;
-	        }
-	        else {
-	            return laFunc;
-	        }
 	    };
 	    // TODO: consider caching the error message computed information
 	    Parser.prototype.raiseNoAltException = function (occurrence, errMsgTypes) {
-	        var errSuffix = " but found: '" + this.LA(1).image + "'";
+	        var errSuffix = " but found: '" + tokens_public_1.getImage(this.LA(1)) + "'";
 	        if (errMsgTypes === undefined) {
 	            var ruleName = this.getCurrRuleFullName();
 	            var ruleGrammar = this.getGAstProductions().get(ruleName);
@@ -1641,9 +1715,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	        throw this.SAVE_ERROR(new exceptions_public_1.exceptions.NoViableAltException("Expecting: " + errMsgTypes + " " + errSuffix, this.LA(1)));
 	    };
+	    Parser.prototype.getLookaheadFuncFor = function (key, occurrence, laFuncBuilder, maxLookahead) {
+	        var laFunc = this.classLAFuncs.get(key);
+	        if (laFunc === undefined) {
+	            var ruleName = this.getCurrRuleFullName();
+	            var ruleGrammar = this.getGAstProductions().get(ruleName);
+	            laFunc = laFuncBuilder.apply(null, 
+	            //TODO: change
+	            [occurrence, ruleGrammar, maxLookahead, this.tokenMatcher,
+	                this.tokenClassIdentityFunc, this.tokenInstanceIdentityFunc, this.dynamicTokensEnabled]);
+	            this.classLAFuncs.put(key, laFunc);
+	            return laFunc;
+	        }
+	        else {
+	            return laFunc;
+	        }
+	    };
 	    // TODO: consider caching the error message computed information
 	    Parser.prototype.raiseEarlyExitException = function (occurrence, prodType, userDefinedErrMsg) {
-	        var errSuffix = " but found: '" + this.LA(1).image + "'";
+	        var errSuffix = " but found: '" + tokens_public_1.getImage(this.LA(1)) + "'";
 	        if (userDefinedErrMsg === undefined) {
 	            var ruleName = this.getCurrRuleFullName();
 	            var ruleGrammar = this.getGAstProductions().get(ruleName);
@@ -1719,34 +1809,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return getFromNestedHashTable(className, exports.CLASS_TO_PRODUCTION_OVERRIDEN);
 	}
 	exports.getProductionOverriddenForClass = getProductionOverriddenForClass;
-	exports.CLASS_TO_OR_LA_CACHE = new lang_extensions_1.HashTable();
-	exports.CLASS_TO_MANY_LA_CACHE = new lang_extensions_1.HashTable();
-	exports.CLASS_TO_MANY_SEP_LA_CACHE = new lang_extensions_1.HashTable();
-	exports.CLASS_TO_AT_LEAST_ONE_LA_CACHE = new lang_extensions_1.HashTable();
-	exports.CLASS_TO_AT_LEAST_ONE_SEP_LA_CACHE = new lang_extensions_1.HashTable();
-	exports.CLASS_TO_OPTION_LA_CACHE = new lang_extensions_1.HashTable();
 	// TODO reflective test to verify this has not changed, for example (OPTION6 added)
 	exports.MAX_OCCURRENCE_INDEX = 5;
-	function initLookAheadKeyCache(className) {
-	    exports.CLASS_TO_OR_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    exports.CLASS_TO_MANY_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    exports.CLASS_TO_MANY_SEP_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    exports.CLASS_TO_AT_LEAST_ONE_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    exports.CLASS_TO_AT_LEAST_ONE_SEP_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    exports.CLASS_TO_OPTION_LA_CACHE[className] = new Array(exports.MAX_OCCURRENCE_INDEX);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_OR_LA_CACHE[className]);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_MANY_LA_CACHE[className]);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_MANY_SEP_LA_CACHE[className]);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_AT_LEAST_ONE_LA_CACHE[className]);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_AT_LEAST_ONE_SEP_LA_CACHE[className]);
-	    initSingleLookAheadKeyCache(exports.CLASS_TO_OPTION_LA_CACHE[className]);
-	}
-	exports.initLookAheadKeyCache = initLookAheadKeyCache;
-	function initSingleLookAheadKeyCache(laCache) {
-	    for (var i = 0; i < exports.MAX_OCCURRENCE_INDEX; i++) {
-	        laCache[i] = new lang_extensions_1.HashTable();
-	    }
-	}
 	function getFromNestedHashTable(className, hashTable) {
 	    var result = hashTable.get(className);
 	    if (result === undefined) {
@@ -2012,7 +2076,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * shallow clone
 	 */
 	function cloneArr(arr) {
-	    return map(arr, function (item) { return item; });
+	    var newArr = [];
+	    for (var i = 0; i < arr.length; i++) {
+	        newArr.push(arr[i]);
+	    }
+	    return newArr;
 	}
 	exports.cloneArr = cloneArr;
 	/**
@@ -2156,6 +2224,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return target;
 	}
 	exports.assign = assign;
+	/**
+	 * mutates! (and returns) target
+	 */
+	function assignNoOverwrite(target) {
+	    var sources = [];
+	    for (var _i = 1; _i < arguments.length; _i++) {
+	        sources[_i - 1] = arguments[_i];
+	    }
+	    for (var i = 0; i < sources.length; i++) {
+	        var curSource = sources[i];
+	        var currSourceKeys = keys(curSource);
+	        for (var j = 0; j < currSourceKeys.length; j++) {
+	            var currKey = currSourceKeys[j];
+	            if (!has(target, currKey)) {
+	                target[currKey] = curSource[currKey];
+	            }
+	        }
+	    }
+	    return target;
+	}
+	exports.assignNoOverwrite = assignNoOverwrite;
 	function groupBy(arr, groupKeyFunc) {
 	    var result = {};
 	    forEach(arr, function (item) {
@@ -2188,6 +2277,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports.merge = merge;
 	function NOOP() { }
 	exports.NOOP = NOOP;
+	function getSuperClass(clazz) {
+	    return Object.getPrototypeOf(clazz.prototype).constructor;
+	}
+	exports.getSuperClass = getSuperClass;
 
 
 /***/ },
@@ -2317,6 +2410,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    /* istanbul ignore next */  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 	};
 	var utils_1 = __webpack_require__(4);
+	var tokens_public_1 = __webpack_require__(8);
 	var gast;
 	(function (gast) {
 	    var AbstractProduction = (function () {
@@ -2508,6 +2602,85 @@ return /******/ (function(modules) { // webpackBootstrap
 	        return GAstVisitor;
 	    }());
 	    gast.GAstVisitor = GAstVisitor;
+	    function serializeGrammar(topRules) {
+	        return utils_1.map(topRules, serializeProduction);
+	    }
+	    gast.serializeGrammar = serializeGrammar;
+	    function serializeProduction(node) {
+	        function convertDefinition(definition) {
+	            return utils_1.map(definition, serializeProduction);
+	        }
+	        if (node instanceof NonTerminal) {
+	            return {
+	                type: "NonTerminal",
+	                name: node.nonTerminalName,
+	                occurrenceInParent: node.occurrenceInParent
+	            };
+	        }
+	        else if (node instanceof Flat) {
+	            return {
+	                type: "Flat",
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof Option) {
+	            return {
+	                type: "Option",
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof RepetitionMandatory) {
+	            return {
+	                type: "RepetitionMandatory",
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof RepetitionMandatoryWithSeparator) {
+	            return {
+	                type: "RepetitionMandatoryWithSeparator",
+	                separator: serializeProduction(new Terminal(node.separator)),
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof RepetitionWithSeparator) {
+	            return {
+	                type: "RepetitionWithSeparator",
+	                separator: serializeProduction(new Terminal(node.separator)),
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof Repetition) {
+	            return {
+	                type: "Repetition",
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof Alternation) {
+	            return {
+	                type: "Alternation",
+	                definition: convertDefinition(node.definition)
+	            };
+	        }
+	        else if (node instanceof Terminal) {
+	            var serializedTerminal = {
+	                type: "Terminal",
+	                name: tokens_public_1.tokenName(node.terminalType),
+	                label: tokens_public_1.tokenLabel(node.terminalType),
+	                occurrenceInParent: node.occurrenceInParent
+	            };
+	            if (node.terminalType.PATTERN) {
+	                serializedTerminal.pattern = node.terminalType.PATTERN.source;
+	            }
+	            return serializedTerminal;
+	        }/* istanbul ignore else */ 
+	        else if (node instanceof Rule) {
+	            return { type: "Rule", name: node.name, definition: convertDefinition(node.definition) };
+	        }
+	        else {
+	            /* istanbul ignore next */ throw Error("non exhaustive match");
+	        }
+	    }
+	    gast.serializeProduction = serializeProduction;
 	})(gast = exports.gast || (exports.gast = {}));
 
 
@@ -2521,12 +2694,1566 @@ return /******/ (function(modules) { // webpackBootstrap
 	    function __() { this.constructor = d; }
 	    /* istanbul ignore next */  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 	};
+	var utils_1 = __webpack_require__(4);
+	var lang_extensions_1 = __webpack_require__(3);
+	var lexer_public_1 = __webpack_require__(9);
+	var tokens_1 = __webpack_require__(11);
+	/**
+	 *  This can be used to improve the quality/readability of error messages or syntax diagrams.
+	 *
+	 * @param {Function} clazz - A constructor for a Token subclass
+	 * @returns {string} - The Human readable label a Token if it exists.
+	 */
+	function tokenLabel(clazz) {
+	    if (hasTokenLabel(clazz)) {
+	        return clazz.LABEL;
+	    }
+	    else {
+	        return tokenName(clazz);
+	    }
+	}
+	exports.tokenLabel = tokenLabel;
+	function hasTokenLabel(clazz) {
+	    return utils_1.isString(clazz.LABEL) && clazz.LABEL !== "";
+	}
+	exports.hasTokenLabel = hasTokenLabel;
+	function tokenName(clazz) {
+	    // The tokenName property is needed under some old versions of node.js (0.10/0.12)
+	    // where the Function.prototype.name property is not defined as a 'configurable' property
+	    // enable producing readable error messages.
+	    /* istanbul ignore if -> will only run in old versions of node.js */
+	    if (utils_1.isString(clazz.tokenName)) {
+	        return clazz.tokenName;
+	    }
+	    else {
+	        return lang_extensions_1.functionName(clazz);
+	    }
+	}
+	exports.tokenName = tokenName;
+	function extendLazyToken(tokenName, patternOrParent, parentConstructor) {
+	    if (patternOrParent === void 0) { patternOrParent = undefined; }
+	    if (parentConstructor === void 0) { parentConstructor = LazyToken; }
+	    return extendToken(tokenName, patternOrParent, parentConstructor);
+	}
+	exports.extendLazyToken = extendLazyToken;
+	function extendSimpleLazyToken(tokenName, patternOrParent, parentConstructor) {
+	    if (patternOrParent === void 0) { patternOrParent = undefined; }
+	    if (parentConstructor === void 0) { parentConstructor = SimpleLazyToken; }
+	    return extendToken(tokenName, patternOrParent, parentConstructor);
+	}
+	exports.extendSimpleLazyToken = extendSimpleLazyToken;
+	/**
+	 * utility to help the poor souls who are still stuck writing pure javascript 5.1
+	 * extend and create Token subclasses in a less verbose manner
+	 *
+	 * @param {string} tokenName - The name of the new TokenClass
+	 * @param {RegExp|Function} patternOrParent - RegExp Pattern or Parent Token Constructor
+	 * @param {Function} parentConstructor - The Token class to be extended
+	 * @returns {Function} - A constructor for the new extended Token subclass
+	 */
+	function extendToken(tokenName, patternOrParent, parentConstructor) {
+	    if (patternOrParent === void 0) { patternOrParent = undefined; }
+	    if (parentConstructor === void 0) { parentConstructor = Token; }
+	    var pattern;
+	    if (utils_1.isRegExp(patternOrParent) ||
+	        patternOrParent === lexer_public_1.Lexer.SKIPPED ||
+	        patternOrParent === lexer_public_1.Lexer.NA) {
+	        pattern = patternOrParent;
+	    }
+	    else if (utils_1.isFunction(patternOrParent)) {
+	        parentConstructor = patternOrParent;
+	        pattern = undefined;
+	    }
+	    var derivedConstructor = function () {
+	        parentConstructor.apply(this, arguments);
+	    };
+	    // can be overwritten according to:
+	    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/
+	    // name?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FFunction%2Fname
+	    /* istanbul ignore if -> will only run in old versions of node.js */
+	    if (!lang_extensions_1.defineNameProp(derivedConstructor, tokenName)) {
+	        // hack to save the tokenName in situations where the constructor's name property cannot be reconfigured
+	        derivedConstructor.tokenName = tokenName;
+	    }
+	    derivedConstructor.prototype = Object.create(parentConstructor.prototype);
+	    derivedConstructor.prototype.constructor = derivedConstructor;
+	    if (!utils_1.isUndefined(pattern)) {
+	        derivedConstructor.PATTERN = pattern;
+	    }
+	    tokens_1.augmentTokenClasses([derivedConstructor]);
+	    // static properties mixing
+	    derivedConstructor = utils_1.assignNoOverwrite(derivedConstructor, parentConstructor);
+	    return derivedConstructor;
+	}
+	exports.extendToken = extendToken;
+	var Token = (function () {
+	    /**
+	     * @param {string} image - The textual representation of the Token as it appeared in the text.
+	     * @param {number} startOffset - Offset of the first character of the Token.
+	     * @param {number} startLine - Line of the first character of the Token.
+	     * @param {number} startColumn - Column of the first character of the Token.
+	     * @param {number} endLine - Line of the last character of the Token.
+	     * @param {number} endColumn - Column of the last character of the Token.
+	     */
+	    function Token(image, startOffset, startLine, startColumn, endLine, endColumn) {
+	        if (endLine === void 0) { endLine = startLine; }
+	        if (endColumn === void 0) { endColumn = startColumn + image.length - 1; }
+	        this.image = image;
+	        this.startOffset = startOffset;
+	        this.startLine = startLine;
+	        this.startColumn = startColumn;
+	        this.endLine = endLine;
+	        this.endColumn = endColumn;
+	        // this marks if a Token does not really exist and has been inserted "artificially" during parsing in rule error recovery
+	        this.isInsertedInRecovery = false;
+	    }
+	    Object.defineProperty(Token.prototype, "endOffset", {
+	        get: function () {
+	            return this.startOffset + this.image.length - 1;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(Token.prototype, "offset", {
+	        /**
+	         * @deprecated
+	         * An Alias for getting the startOffset. this is deprecated and remains only to be backwards compatiable.
+	         * This API will be removed in future version of Chevrotain.
+	         */
+	        get: function () {
+	            return this.startOffset;
+	        },
+	        /**
+	         * @deprecated
+	         * An Alias for setting the startOffset. this is deprecated and remains only to be backwards compatiable.
+	         * This API will be removed in future version of Chevrotain.
+	         */
+	        set: function (newOffset) {
+	            this.startOffset = newOffset;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    /**
+	     * A "human readable" Label for a Token.
+	     * Subclasses of Token may define their own static LABEL property.
+	     * This label will be used in error messages and drawing syntax diagrams.
+	     *
+	     * For example a Token constructor may be called LCurly, which is short for LeftCurlyBrackets, These names are either too short
+	     * or too unwieldy to be used in error messages.
+	     *
+	     * Imagine : "expecting LCurly but found ')'" or "expecting LeftCurlyBrackets but found ')'"
+	     *
+	     * However if a static property LABEL with the value '{' exists on LCurly class, that error message will be:
+	     * "expecting '{' but found ')'"
+	     */
+	    Token.LABEL = undefined;
+	    return Token;
+	}());
+	exports.Token = Token;
+	/**
+	 * @see IToken
+	 * @see Token
+	 *
+	 * Same API as a IToken, using a Lazy implementation, with most properties being immutable.
+	 * See related doc in: https://github.com/SAP/chevrotain/blob/startO/docs/faq.md#-how-do-i-maximize-my-parsers-performance
+	 * ("Use Lazy Tokens" section)
+	 */
+	var LazyToken = (function () {
+	    function LazyToken(startOffset, endOffset, cacheData) {
+	        this.startOffset = startOffset;
+	        this.endOffset = endOffset;
+	        this.cacheData = cacheData;
+	    }
+	    Object.defineProperty(LazyToken.prototype, "image", {
+	        get: function () {
+	            return tokens_1.getImageFromLazyToken(this);
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(LazyToken.prototype, "startLine", {
+	        get: function () {
+	            return tokens_1.getStartLineFromLazyToken(this);
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(LazyToken.prototype, "startColumn", {
+	        get: function () {
+	            return tokens_1.getStartColumnFromLazyToken(this);
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(LazyToken.prototype, "endLine", {
+	        get: function () {
+	            return tokens_1.getEndLineFromLazyToken(this);
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    Object.defineProperty(LazyToken.prototype, "endColumn", {
+	        get: function () {
+	            return tokens_1.getEndColumnFromLazyToken(this);
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	    /**
+	     * A "human readable" Label for a Token.
+	     * Subclasses of Token may define their own static LABEL property.
+	     * This label will be used in error messages and drawing syntax diagrams.
+	     *
+	     * For example a Token constructor may be called LCurly, which is short for LeftCurlyBrackets, These names are either too short
+	     * or too unwieldy to be used in error messages.
+	     *
+	     * Imagine : "expecting LCurly but found ')'" or "expecting LeftCurlyBrackets but found ')'"
+	     *
+	     * However if a static property LABEL with the value '{' exists on LCurly class, that error message will be:
+	     * "expecting '{' but found ')'"
+	     */
+	    LazyToken.LABEL = undefined;
+	    return LazyToken;
+	}());
+	exports.LazyToken = LazyToken;
+	/**
+	 * @see IToken
+	 * @see LazyToken
+	 *
+	 * A Less complex LazyToken used to increase performance.
+	 * Instances of SimpleLazyToken will not actually inherit from it using prototype inheritance.
+	 * Instead they will be simple JS Objects (Simple Structures)
+	 * {
+	 *    startOffset : 10,
+	 *    endOffset   : 16,
+	 *    tokenType   : 66,
+	 *    cacheData   : cacheData
+	 * }
+	 *
+	 * The additional computed properties (startLine/StartColumn/...) of the IToken interface can be computed using
+	 * The provided Utility methods (getImage, getStartColumn, getEndLine, ...)
+	 *
+	 * This makes SimpleLazyTokens slightly less convenient, however this can produce a substantial increase in performance
+	 * which may be relevant in certain use cases where performance is of paramount concern.
+	 */
+	var SimpleLazyToken = (function () {
+	    // This constructor is never actually called as simpleLazyToken are just a Structure.
+	    // However this class must still exist as the definition and hierarchy of the SimpleLazyTokens
+	    // still uses the standard prototype chain.
+	    /* istanbul ignore next */
+	    function SimpleLazyToken(startOffset, endOffset, tokenType, cacheData) {
+	        this.startOffset = startOffset;
+	        this.endOffset = endOffset;
+	        this.tokenType = tokenType;
+	        this.cacheData = cacheData;
+	    }
+	    /**
+	     * A "human readable" Label for a Token.
+	     * Subclasses of Token may define their own static LABEL property.
+	     * This label will be used in error messages and drawing syntax diagrams.
+	     *
+	     * For example a Token constructor may be called LCurly, which is short for LeftCurlyBrackets, These names are either too short
+	     * or too unwieldy to be used in error messages.
+	     *
+	     * Imagine : "expecting LCurly but found ')'" or "expecting LeftCurlyBrackets but found ')'"
+	     *
+	     * However if a static property LABEL with the value '{' exists on LCurly class, that error message will be:
+	     * "expecting '{' but found ')'"
+	     */
+	    SimpleLazyToken.LABEL = undefined;
+	    return SimpleLazyToken;
+	}());
+	exports.SimpleLazyToken = SimpleLazyToken;
+	/**
+	 * A special kind of Token which does not really exist in the input
+	 * (hence the 'Virtual' prefix). These type of Tokens can be used as special markers:
+	 * for example, EOF (end-of-file).
+	 */
+	var VirtualToken = (function (_super) {
+	    __extends(VirtualToken, _super);
+	    function VirtualToken() {
+	        _super.call(this, "", NaN, NaN, NaN, NaN, NaN);
+	    }
+	    return VirtualToken;
+	}(Token));
+	exports.VirtualToken = VirtualToken;
+	var EOF = (function (_super) {
+	    __extends(EOF, _super);
+	    function EOF() {
+	        _super.apply(this, arguments);
+	    }
+	    return EOF;
+	}(VirtualToken));
+	exports.EOF = EOF;
+	tokens_1.augmentTokenClasses([EOF]);
+	// Token Getter Utilities
+	function getImage(token) {
+	    return tokens_1.isInheritanceBasedToken(token) ?
+	        token.image :
+	        tokens_1.getImageFromLazyToken(token);
+	}
+	exports.getImage = getImage;
+	function getStartOffset(token) {
+	    return token.startOffset;
+	}
+	exports.getStartOffset = getStartOffset;
+	function getStartLine(token) {
+	    return tokens_1.isInheritanceBasedToken(token) ?
+	        token.startLine :
+	        tokens_1.getStartLineFromLazyToken(token);
+	}
+	exports.getStartLine = getStartLine;
+	function getStartColumn(token) {
+	    return tokens_1.isInheritanceBasedToken(token) ?
+	        token.startColumn :
+	        tokens_1.getStartColumnFromLazyToken(token);
+	}
+	exports.getStartColumn = getStartColumn;
+	function getEndOffset(token) {
+	    return token.endOffset;
+	}
+	exports.getEndOffset = getEndOffset;
+	function getEndLine(token) {
+	    return tokens_1.isInheritanceBasedToken(token) ?
+	        token.endLine :
+	        tokens_1.getEndLineFromLazyToken(token);
+	}
+	exports.getEndLine = getEndLine;
+	function getEndColumn(token) {
+	    return tokens_1.isInheritanceBasedToken(token) ?
+	        token.endColumn :
+	        tokens_1.getEndColumnFromLazyToken(token);
+	}
+	exports.getEndColumn = getEndColumn;
+	/**
+	 * Given a Token instance, will return the Token Constructor.
+	 * Note that this function is not just for convenience, Because a SimpleLazyToken "instance'
+	 * Does not use standard prototype inheritance and thus it's constructor cannot be accessed
+	 * by traversing the prototype chain.
+	 *
+	 * @param tokenInstance {ISimpleTokenOrIToken}
+	 * @returns {TokenConstructor}
+	 */
+	function getTokenConstructor(tokenInstance) {
+	    var tokenIdx;
+	    if (tokens_1.isInheritanceBasedToken(tokenInstance)) {
+	        tokenIdx = tokenInstance.constructor.tokenType;
+	    }
+	    else {
+	        tokenIdx = tokenInstance.tokenType;
+	    }
+	    return tokens_1.tokenIdxToClass.get(tokenIdx);
+	}
+	exports.getTokenConstructor = getTokenConstructor;
+	/**
+	 * A Utility method to check if a token instance of of the type of a specific Token class.
+	 * Simply using instanceof is not enough because SimpleLazyToken Implementation does not use
+	 * ECMAScript's built-in prototype inheritance.
+	 *
+	 * @param tokInstance {ISimpleTokenOrIToken}
+	 * @param tokClass {TokenConstructor}
+	 * @returns {boolean}
+	 */
+	function tokenMatcher(tokInstance, tokClass) {
+	    if (LazyToken.prototype.isPrototypeOf(tokClass.prototype) ||
+	        Token.prototype.isPrototypeOf(tokClass.prototype)) {
+	        return tokens_1.tokenInstanceofMatcher(tokInstance, tokClass);
+	    }/* istanbul ignore else */ 
+	    else if (SimpleLazyToken.prototype.isPrototypeOf(tokClass.prototype)) {
+	        return tokens_1.tokenStructuredMatcher(tokInstance, tokClass);
+	    }
+	    else {
+	        /* istanbul ignore next */ throw Error("non exhaustive match");
+	    }
+	}
+	exports.tokenMatcher = tokenMatcher;
+
+
+/***/ },
+/* 9 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	var tokens_public_1 = __webpack_require__(8);
+	var lexer_1 = __webpack_require__(10);
+	var utils_1 = __webpack_require__(4);
+	var tokens_1 = __webpack_require__(11);
+	(function (LexerDefinitionErrorType) {
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["MISSING_PATTERN"] = 0] = "MISSING_PATTERN";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["INVALID_PATTERN"] = 1] = "INVALID_PATTERN";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["EOI_ANCHOR_FOUND"] = 2] = "EOI_ANCHOR_FOUND";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["UNSUPPORTED_FLAGS_FOUND"] = 3] = "UNSUPPORTED_FLAGS_FOUND";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["DUPLICATE_PATTERNS_FOUND"] = 4] = "DUPLICATE_PATTERNS_FOUND";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["INVALID_GROUP_TYPE_FOUND"] = 5] = "INVALID_GROUP_TYPE_FOUND";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["PUSH_MODE_DOES_NOT_EXIST"] = 6] = "PUSH_MODE_DOES_NOT_EXIST";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE"] = 7] = "MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY"] = 8] = "MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST"] = 9] = "MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED"] = 10] = "LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY"] = 11] = "LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY";
+	    LexerDefinitionErrorType[LexerDefinitionErrorType["LEXER_DEFINITION_CANNOT_MIX_SIMPLE_AND_NOT_SIMPLE"] = 12] = "LEXER_DEFINITION_CANNOT_MIX_SIMPLE_AND_NOT_SIMPLE";
+	})(exports.LexerDefinitionErrorType || (exports.LexerDefinitionErrorType = {}));
+	var LexerDefinitionErrorType = exports.LexerDefinitionErrorType;
+	var Lexer = (function () {
+	    /**
+	     * @param {SingleModeLexerDefinition | IMultiModeLexerDefinition} lexerDefinition -
+	     *  Structure composed of constructor functions for the Tokens types this lexer will support.
+	     *
+	     *  In the case of {SingleModeLexerDefinition} the structure is simply an array of Token constructors.
+	     *  In the case of {IMultiModeLexerDefinition} the structure is an object with two properties:
+	     *    1. a "modes" property where each value is an array of Token.
+	     *    2. a "defaultMode" property specifying the initial lexer mode.
+	     *
+	     *  constructors.
+	     *
+	     *  for example:
+	     *  {
+	     *     "modes" : {
+	     *     "modeX" : [Token1, Token2]
+	     *     "modeY" : [Token3, Token4]
+	     *     }
+	     *
+	     *     "defaultMode" : "modeY"
+	     *  }
+	     *
+	     *  A lexer with {MultiModesDefinition} is simply multiple Lexers where only one (mode) can be active at the same time.
+	     *  This is useful for lexing languages where there are different lexing rules depending on context.
+	     *
+	     *  The current lexing mode is selected via a "mode stack".
+	     *  The last (peek) value in the stack will be the current mode of the lexer.
+	     *
+	     *  Each Token class can define that it will cause the Lexer to (after consuming an instance of the Token):
+	     *  1. PUSH_MODE : push a new mode to the "mode stack"
+	     *  2. POP_MODE  : pop the last mode from the "mode stack"
+	     *
+	     *  Examples:
+	     *       export class Attribute extends Token {
+	     *          static PATTERN = ...
+	     *          static PUSH_MODE = "modeY"
+	     *       }
+	     *
+	     *       export class EndAttribute extends Token {
+	     *          static PATTERN = ...
+	     *          static POP_MODE = true
+	     *       }
+	     *
+	     *  The Token constructors must be in one of these forms:
+	     *
+	     *  1. With a PATTERN property that has a RegExp value for tokens to match:
+	     *     example: -->class Integer extends Token { static PATTERN = /[1-9]\d }<--
+	     *
+	     *  2. With a PATTERN property that has the value of the var Lexer.NA defined above.
+	     *     This is a convenience form used to avoid matching Token classes that only act as categories.
+	     *     example: -->class Keyword extends Token { static PATTERN = NA }<--
+	     *
+	     *
+	     *   The following RegExp patterns are not supported:
+	     *   a. '$' for match at end of input
+	     *   b. /b global flag
+	     *   c. /m multi-line flag
+	     *
+	     *   The Lexer will identify the first pattern that matches, Therefor the order of Token Constructors may be significant.
+	     *   For example when one pattern may match a prefix of another pattern.
+	     *
+	     *   Note that there are situations in which we may wish to order the longer pattern after the shorter one.
+	     *   For example: keywords vs Identifiers.
+	     *   'do'(/do/) and 'donald'(/w+)
+	     *
+	     *   * If the Identifier pattern appears before the 'do' pattern, both 'do' and 'donald'
+	     *     will be lexed as an Identifier.
+	     *
+	     *   * If the 'do' pattern appears before the Identifier pattern 'do' will be lexed correctly as a keyword.
+	     *     however 'donald' will be lexed as TWO separate tokens: keyword 'do' and identifier 'nald'.
+	     *
+	     *   To resolve this problem, add a static property on the keyword's constructor named: LONGER_ALT
+	     *   example:
+	     *
+	     *       export class Identifier extends Keyword { static PATTERN = /[_a-zA-Z][_a-zA-Z0-9]/ }
+	     *       export class Keyword extends Token {
+	     *          static PATTERN = lex.NA
+	     *          static LONGER_ALT = Identifier
+	     *       }
+	     *       export class Do extends Keyword { static PATTERN = /do/ }
+	     *       export class While extends Keyword { static PATTERN = /while/ }
+	     *       export class Return extends Keyword { static PATTERN = /return/ }
+	     *
+	     *   The lexer will then also attempt to match a (longer) Identifier each time a keyword is matched.
+	     *
+	     *
+	     * @param {boolean} [deferDefinitionErrorsHandling=false] -
+	     *                  An optional flag indicating that lexer definition errors
+	     *                  should not automatically cause an error to be raised.
+	     *                  This can be useful when wishing to indicate lexer errors in another manner
+	     *                  than simply throwing an error (for example in an online playground).
+	     */
+	    function Lexer(lexerDefinition, deferDefinitionErrorsHandling) {
+	        var _this = this;
+	        if (deferDefinitionErrorsHandling === void 0) { deferDefinitionErrorsHandling = false; }
+	        this.lexerDefinition = lexerDefinition;
+	        this.lexerDefinitionErrors = [];
+	        this.modes = [];
+	        this.allPatterns = {};
+	        this.patternIdxToClass = {};
+	        this.patternIdxToGroup = {};
+	        this.patternIdxToLongerAltIdx = {};
+	        this.patternIdxToCanLineTerminator = {};
+	        this.patternIdxToPushMode = {};
+	        this.patternIdxToPopMode = {};
+	        this.emptyGroups = {};
+	        var actualDefinition;
+	        // Convert SingleModeLexerDefinition into a IMultiModeLexerDefinition.
+	        if (utils_1.isArray(lexerDefinition)) {
+	            actualDefinition = { modes: {} };
+	            actualDefinition.modes[lexer_1.DEFAULT_MODE] = utils_1.cloneArr(lexerDefinition);
+	            actualDefinition[lexer_1.DEFAULT_MODE] = lexer_1.DEFAULT_MODE;
+	        }
+	        else {
+	            actualDefinition = utils_1.cloneObj(lexerDefinition);
+	        }
+	        this.lexerDefinitionErrors = this.lexerDefinitionErrors.concat(lexer_1.performRuntimeChecks(actualDefinition));
+	        // for extra robustness to avoid throwing an none informative error message
+	        actualDefinition.modes = actualDefinition.modes ? actualDefinition.modes : {};
+	        // an error of undefined TokenClasses will be detected in "performRuntimeChecks" above.
+	        // this transformation is to increase robustness in the case of partially invalid lexer definition.
+	        utils_1.forEach(actualDefinition.modes, function (currModeValue, currModeName) {
+	            actualDefinition.modes[currModeName] = utils_1.reject(currModeValue, function (currTokClass) { return utils_1.isUndefined(currTokClass); });
+	        });
+	        var allModeNames = utils_1.keys(actualDefinition.modes);
+	        utils_1.forEach(actualDefinition.modes, function (currModDef, currModName) {
+	            _this.modes.push(currModName);
+	            _this.lexerDefinitionErrors = _this.lexerDefinitionErrors.concat(lexer_1.validatePatterns(currModDef, allModeNames));
+	            // If definition errors were encountered, the analysis phase may fail unexpectedly/
+	            // Considering a lexer with definition errors may never be used, there is no point
+	            // to performing the analysis anyhow...
+	            if (utils_1.isEmpty(_this.lexerDefinitionErrors)) {
+	                tokens_1.augmentTokenClasses(currModDef);
+	                var currAnalyzeResult = lexer_1.analyzeTokenClasses(currModDef);
+	                _this.allPatterns[currModName] = currAnalyzeResult.allPatterns;
+	                _this.patternIdxToClass[currModName] = currAnalyzeResult.patternIdxToClass;
+	                _this.patternIdxToGroup[currModName] = currAnalyzeResult.patternIdxToGroup;
+	                _this.patternIdxToLongerAltIdx[currModName] = currAnalyzeResult.patternIdxToLongerAltIdx;
+	                _this.patternIdxToCanLineTerminator[currModName] = currAnalyzeResult.patternIdxToCanLineTerminator;
+	                _this.patternIdxToPushMode[currModName] = currAnalyzeResult.patternIdxToPushMode;
+	                _this.patternIdxToPopMode[currModName] = currAnalyzeResult.patternIdxToPopMode;
+	                _this.emptyGroups = utils_1.merge(_this.emptyGroups, currAnalyzeResult.emptyGroups);
+	            }
+	        });
+	        this.defaultMode = actualDefinition.defaultMode;
+	        var allTokensTypes = utils_1.flatten(utils_1.mapValues(actualDefinition.modes, function (currModDef) { return currModDef; }));
+	        // Lazy Mode handling
+	        var lazyCheckResult = lexer_1.checkLazyMode(allTokensTypes);
+	        this.isLazyTokenMode = lazyCheckResult.isLazy;
+	        this.lexerDefinitionErrors = this.lexerDefinitionErrors.concat(lazyCheckResult.errors);
+	        // Simple Mode handling
+	        var simpleCheckResult = lexer_1.checkSimpleMode(allTokensTypes);
+	        this.isSimpleTokenMode = simpleCheckResult.isSimple;
+	        this.lexerDefinitionErrors = this.lexerDefinitionErrors.concat(simpleCheckResult.errors);
+	        if (!utils_1.isEmpty(this.lexerDefinitionErrors) && !deferDefinitionErrorsHandling) {
+	            var allErrMessages = utils_1.map(this.lexerDefinitionErrors, function (error) {
+	                return error.message;
+	            });
+	            var allErrMessagesString = allErrMessages.join("-----------------------\n");
+	            throw new Error("Errors detected in definition of Lexer:\n" + allErrMessagesString);
+	        }
+	    }
+	    /**
+	     * Will lex(Tokenize) a string.
+	     * Note that this can be called repeatedly on different strings as this method
+	     * does not modify the state of the Lexer.
+	     *
+	     * @param {string} text - The string to lex
+	     * @param {string} [initialMode] - The initial Lexer Mode to start with, by default this will be the first mode in the lexer's
+	     *                                 definition. If the lexer has no explicit modes it will be the implicit single 'default_mode' mode.
+	     *
+	     * @returns {ILexingResult}
+	     */
+	    Lexer.prototype.tokenize = function (text, initialMode) {
+	        if (initialMode === void 0) { initialMode = this.defaultMode; }
+	        if (!utils_1.isEmpty(this.lexerDefinitionErrors)) {
+	            var allErrMessages = utils_1.map(this.lexerDefinitionErrors, function (error) {
+	                return error.message;
+	            });
+	            var allErrMessagesString = allErrMessages.join("-----------------------\n");
+	            throw new Error("Unable to Tokenize because Errors detected in definition of Lexer:\n" + allErrMessagesString);
+	        }
+	        if (this.isLazyTokenMode) {
+	            if (this.isSimpleTokenMode) {
+	                return this.tokenizeInternalLazy(text, initialMode, tokens_1.createSimpleLazyToken);
+	            }
+	            else {
+	                return this.tokenizeInternalLazy(text, initialMode, tokens_1.createLazyTokenInstance);
+	            }
+	        }
+	        else {
+	            return this.tokenizeInternal(text, initialMode);
+	        }
+	    };
+	    // There is quite a bit of duplication between this and "tokenizeInternalLazy"
+	    // This is intentional due to performance considerations.
+	    Lexer.prototype.tokenizeInternal = function (text, initialMode) {
+	        var _this = this;
+	        var match, i, j, matchAlt, longerAltIdx, matchedImage, imageLength, group, tokClass, newToken, errLength, fixForEndingInLT, c, droppedChar, lastLTIdx, msg, lastCharIsLT;
+	        var orgInput = text;
+	        var offset = 0;
+	        var matchedTokens = [];
+	        var errors = [];
+	        var line = 1;
+	        var column = 1;
+	        var groups = lexer_1.cloneEmptyGroups(this.emptyGroups);
+	        var currModePatterns = [];
+	        var currModePatternsLength = 0;
+	        var currModePatternIdxToLongerAltIdx = [];
+	        var currModePatternIdxToGroup = [];
+	        var currModePatternIdxToClass = [];
+	        var currModePatternIdxToCanLineTerminator = [];
+	        var patternIdxToPushMode = [];
+	        var patternIdxToPopMode = [];
+	        var modeStack = [];
+	        var pop_mode = function (popToken) {
+	            // TODO: perhaps avoid this error in the edge case there is no more input?
+	            if (modeStack.length === 1) {
+	                // if we try to pop the last mode there lexer will no longer have ANY mode.
+	                // thus the pop is ignored, an error will be created and the lexer will continue parsing in the previous mode.
+	                var msg_1 = "Unable to pop Lexer Mode after encountering Token ->" + tokens_public_1.getImage(popToken) + "<- The Mode Stack is empty";
+	                errors.push({
+	                    line: tokens_public_1.getStartLine(popToken),
+	                    column: tokens_public_1.getStartColumn(popToken),
+	                    length: tokens_public_1.getImage(popToken).length,
+	                    message: msg_1
+	                });
+	            }
+	            else {
+	                modeStack.pop();
+	                var newMode = utils_1.last(modeStack);
+	                currModePatterns = _this.allPatterns[newMode];
+	                currModePatternsLength = currModePatterns.length;
+	                currModePatternIdxToLongerAltIdx = _this.patternIdxToLongerAltIdx[newMode];
+	                currModePatternIdxToGroup = _this.patternIdxToGroup[newMode];
+	                currModePatternIdxToClass = _this.patternIdxToClass[newMode];
+	                currModePatternIdxToCanLineTerminator = _this.patternIdxToCanLineTerminator[newMode];
+	                patternIdxToPushMode = _this.patternIdxToPushMode[newMode];
+	                patternIdxToPopMode = _this.patternIdxToPopMode[newMode];
+	            }
+	        };
+	        function push_mode(newMode) {
+	            modeStack.push(newMode);
+	            currModePatterns = this.allPatterns[newMode];
+	            currModePatternsLength = currModePatterns.length;
+	            currModePatternIdxToLongerAltIdx = this.patternIdxToLongerAltIdx[newMode];
+	            currModePatternIdxToGroup = this.patternIdxToGroup[newMode];
+	            currModePatternIdxToClass = this.patternIdxToClass[newMode];
+	            currModePatternIdxToCanLineTerminator = this.patternIdxToCanLineTerminator[newMode];
+	            patternIdxToPushMode = this.patternIdxToPushMode[newMode];
+	            patternIdxToPopMode = this.patternIdxToPopMode[newMode];
+	        }
+	        // this pattern seems to avoid a V8 de-optimization, although that de-optimization does not
+	        // seem to matter performance wise.
+	        push_mode.call(this, initialMode);
+	        while (text.length > 0) {
+	            match = null;
+	            for (i = 0; i < currModePatternsLength; i++) {
+	                match = currModePatterns[i].exec(text);
+	                if (match !== null) {
+	                    // even though this pattern matched we must try a another longer alternative.
+	                    // this can be used to prioritize keywords over identifiers
+	                    longerAltIdx = currModePatternIdxToLongerAltIdx[i];
+	                    if (longerAltIdx) {
+	                        matchAlt = currModePatterns[longerAltIdx].exec(text);
+	                        if (matchAlt && matchAlt[0].length > match[0].length) {
+	                            match = matchAlt;
+	                            i = longerAltIdx;
+	                        }
+	                    }
+	                    break;
+	                }
+	            }
+	            // successful match
+	            if (match !== null) {
+	                matchedImage = match[0];
+	                imageLength = matchedImage.length;
+	                group = currModePatternIdxToGroup[i];
+	                if (group !== undefined) {
+	                    tokClass = currModePatternIdxToClass[i];
+	                    newToken = new tokClass(matchedImage, offset, line, column);
+	                    if (group === "default") {
+	                        matchedTokens.push(newToken);
+	                    }
+	                    else {
+	                        groups[group].push(newToken);
+	                    }
+	                }
+	                text = text.slice(imageLength);
+	                offset = offset + imageLength;
+	                column = column + imageLength; // TODO: with newlines the column may be assigned twice
+	                if (currModePatternIdxToCanLineTerminator[i]) {
+	                    var lineTerminatorsInMatch = lexer_1.countLineTerminators(matchedImage);
+	                    // TODO: identify edge case of one token ending in '\r' and another one starting with '\n'
+	                    if (lineTerminatorsInMatch !== 0) {
+	                        line = line + lineTerminatorsInMatch;
+	                        lastLTIdx = imageLength - 1;
+	                        while (lastLTIdx >= 0) {
+	                            c = matchedImage.charCodeAt(lastLTIdx);
+	                            // scan in reverse to find last lineTerminator in image
+	                            if (c === 13 || c === 10) {
+	                                break;
+	                            }
+	                            lastLTIdx--;
+	                        }
+	                        column = imageLength - lastLTIdx;
+	                        if (group !== undefined) {
+	                            lastCharIsLT = lastLTIdx === imageLength - 1;
+	                            fixForEndingInLT = lastCharIsLT ?
+	                                -1 :
+	                                0;
+	                            if (!(lineTerminatorsInMatch === 1 && lastCharIsLT)) {
+	                                // if a token ends in a LT that last LT only affects the line numbering of following Tokens
+	                                newToken.endLine = line + fixForEndingInLT;
+	                                // the last LT in a token does not affect the endColumn either as the [columnStart ... columnEnd)
+	                                // inclusive to exclusive range.
+	                                newToken.endColumn = column - 1 + -fixForEndingInLT;
+	                            }
+	                        }
+	                    }
+	                }
+	                // mode handling, must pop before pushing if a Token both acts as both
+	                // otherwise it would be a NO-OP
+	                if (patternIdxToPopMode[i]) {
+	                    pop_mode(newToken);
+	                }
+	                if (patternIdxToPushMode[i]) {
+	                    push_mode.call(this, patternIdxToPushMode[i]);
+	                }
+	            }
+	            else {
+	                var errorStartOffset = offset;
+	                var errorLine = line;
+	                var errorColumn = column;
+	                var foundResyncPoint = false;
+	                while (!foundResyncPoint && text.length > 0) {
+	                    // drop chars until we succeed in matching something
+	                    droppedChar = text.charCodeAt(0);
+	                    if (droppedChar === 10 ||
+	                        (droppedChar === 13 &&
+	                            (text.length === 1 || (text.length > 1 && text.charCodeAt(1) !== 10)))) {
+	                        line++;
+	                        column = 1;
+	                    }
+	                    else {
+	                        // either when skipping the next char, or when consuming the following pattern
+	                        // (which will have to start in a '\n' if we manage to consume it)
+	                        column++;
+	                    }
+	                    text = text.substr(1);
+	                    offset++;
+	                    for (j = 0; j < currModePatterns.length; j++) {
+	                        foundResyncPoint = currModePatterns[j].test(text);
+	                        if (foundResyncPoint) {
+	                            break;
+	                        }
+	                    }
+	                }
+	                errLength = offset - errorStartOffset;
+	                // at this point we either re-synced or reached the end of the input text
+	                msg = ("unexpected character: ->" + orgInput.charAt(errorStartOffset) + "<- at offset: " + errorStartOffset + ",") +
+	                    (" skipped " + (offset - errorStartOffset) + " characters.");
+	                errors.push({ line: errorLine, column: errorColumn, length: errLength, message: msg });
+	            }
+	        }
+	        return { tokens: matchedTokens, groups: groups, errors: errors };
+	    };
+	    Lexer.prototype.tokenizeInternalLazy = function (text, initialMode, tokenCreator) {
+	        var _this = this;
+	        var match, i, j, matchAlt, longerAltIdx, matchedImage, imageLength, group, tokClass, newToken, errLength, droppedChar, msg;
+	        var orgInput = text;
+	        var offset = 0;
+	        var matchedTokens = [];
+	        var errors = [];
+	        var groups = lexer_1.cloneEmptyGroups(this.emptyGroups);
+	        var currModePatterns = [];
+	        var currModePatternsLength = 0;
+	        var currModePatternIdxToLongerAltIdx = [];
+	        var currModePatternIdxToGroup = [];
+	        var currModePatternIdxToClass = [];
+	        var patternIdxToPushMode = [];
+	        var patternIdxToPopMode = [];
+	        var lazyCacheData = {
+	            orgText: text,
+	            lineToOffset: []
+	        };
+	        var modeStack = [];
+	        var pop_mode = function (popToken) {
+	            // TODO: perhaps avoid this error in the edge case there is no more input?
+	            if (modeStack.length === 1) {
+	                // if we try to pop the last mode there lexer will no longer have ANY mode.
+	                // thus the pop is ignored, an error will be created and the lexer will continue parsing in the previous mode.
+	                var msg_2 = "Unable to pop Lexer Mode after encountering Token ->" + tokens_public_1.getImage(popToken) + "<- The Mode Stack is empty";
+	                errors.push({
+	                    line: tokens_public_1.getStartLine(popToken),
+	                    column: tokens_public_1.getStartColumn(popToken),
+	                    length: tokens_public_1.getImage(popToken).length,
+	                    message: msg_2
+	                });
+	            }
+	            else {
+	                modeStack.pop();
+	                var newMode = utils_1.last(modeStack);
+	                currModePatterns = _this.allPatterns[newMode];
+	                currModePatternsLength = currModePatterns.length;
+	                currModePatternIdxToLongerAltIdx = _this.patternIdxToLongerAltIdx[newMode];
+	                currModePatternIdxToGroup = _this.patternIdxToGroup[newMode];
+	                currModePatternIdxToClass = _this.patternIdxToClass[newMode];
+	                patternIdxToPushMode = _this.patternIdxToPushMode[newMode];
+	                patternIdxToPopMode = _this.patternIdxToPopMode[newMode];
+	            }
+	        };
+	        function push_mode(newMode) {
+	            modeStack.push(newMode);
+	            currModePatterns = this.allPatterns[newMode];
+	            currModePatternsLength = currModePatterns.length;
+	            currModePatternIdxToLongerAltIdx = this.patternIdxToLongerAltIdx[newMode];
+	            currModePatternIdxToGroup = this.patternIdxToGroup[newMode];
+	            currModePatternIdxToClass = this.patternIdxToClass[newMode];
+	            patternIdxToPushMode = this.patternIdxToPushMode[newMode];
+	            patternIdxToPopMode = this.patternIdxToPopMode[newMode];
+	        }
+	        // this pattern seems to avoid a V8 de-optimization, although that de-optimization does not
+	        // seem to matter performance wise.
+	        push_mode.call(this, initialMode);
+	        while (text.length > 0) {
+	            match = null;
+	            for (i = 0; i < currModePatternsLength; i++) {
+	                match = currModePatterns[i].exec(text);
+	                if (match !== null) {
+	                    // even though this pattern matched we must try a another longer alternative.
+	                    // this can be used to prioritize keywords over identifiers
+	                    longerAltIdx = currModePatternIdxToLongerAltIdx[i];
+	                    if (longerAltIdx) {
+	                        matchAlt = currModePatterns[longerAltIdx].exec(text);
+	                        if (matchAlt && matchAlt[0].length > match[0].length) {
+	                            match = matchAlt;
+	                            i = longerAltIdx;
+	                        }
+	                    }
+	                    break;
+	                }
+	            }
+	            // successful match
+	            if (match !== null) {
+	                matchedImage = match[0];
+	                imageLength = matchedImage.length;
+	                group = currModePatternIdxToGroup[i];
+	                if (group !== undefined) {
+	                    tokClass = currModePatternIdxToClass[i];
+	                    // the end offset is non inclusive.
+	                    newToken = tokenCreator(offset, offset + imageLength - 1, tokClass, lazyCacheData);
+	                    if (group === "default") {
+	                        matchedTokens.push(newToken);
+	                    }
+	                    else {
+	                        groups[group].push(newToken);
+	                    }
+	                }
+	                text = text.slice(imageLength);
+	                offset = offset + imageLength;
+	                // mode handling, must pop before pushing if a Token both acts as both
+	                // otherwise it would be a NO-OP
+	                if (patternIdxToPopMode[i]) {
+	                    pop_mode(newToken);
+	                }
+	                if (patternIdxToPushMode[i]) {
+	                    push_mode.call(this, patternIdxToPushMode[i]);
+	                }
+	            }
+	            else {
+	                var errorStartOffset = offset;
+	                var foundResyncPoint = false;
+	                while (!foundResyncPoint && text.length > 0) {
+	                    // drop chars until we succeed in matching something
+	                    droppedChar = text.charCodeAt(0);
+	                    text = text.substr(1);
+	                    offset++;
+	                    for (j = 0; j < currModePatterns.length; j++) {
+	                        foundResyncPoint = currModePatterns[j].test(text);
+	                        if (foundResyncPoint) {
+	                            break;
+	                        }
+	                    }
+	                }
+	                errLength = offset - errorStartOffset;
+	                // at this point we either re-synced or reached the end of the input text
+	                msg = ("unexpected character: ->" + orgInput.charAt(errorStartOffset) + "<- at offset: " + errorStartOffset + ",") +
+	                    (" skipped " + (offset - errorStartOffset) + " characters.");
+	                if (utils_1.isEmpty(lazyCacheData.lineToOffset)) {
+	                    tokens_1.fillUpLineToOffset(lazyCacheData.lineToOffset, lazyCacheData.orgText);
+	                }
+	                var errorLine = tokens_1.getStartLineFromLineToOffset(errorStartOffset, lazyCacheData.lineToOffset);
+	                var errorColumn = tokens_1.getStartColumnFromLineToOffset(errorStartOffset, lazyCacheData.lineToOffset);
+	                errors.push({ line: errorLine, column: errorColumn, length: errLength, message: msg });
+	            }
+	        }
+	        return { tokens: matchedTokens, groups: groups, errors: errors };
+	    };
+	    Lexer.SKIPPED = {
+	        description: "This marks a skipped Token pattern, this means each token identified by it will" +
+	            "be consumed and then throw into oblivion, this can be used to for example: skip whitespace."
+	    };
+	    Lexer.NA = /NOT_APPLICABLE/;
+	    return Lexer;
+	}());
+	exports.Lexer = Lexer;
+
+
+/***/ },
+/* 10 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	var tokens_public_1 = __webpack_require__(8);
+	var lexer_public_1 = __webpack_require__(9);
+	var utils_1 = __webpack_require__(4);
+	var tokens_1 = __webpack_require__(11);
+	var PATTERN = "PATTERN";
+	exports.DEFAULT_MODE = "defaultMode";
+	exports.MODES = "modes";
+	function analyzeTokenClasses(tokenClasses) {
+	    var onlyRelevantClasses = utils_1.reject(tokenClasses, function (currClass) {
+	        return currClass[PATTERN] === lexer_public_1.Lexer.NA;
+	    });
+	    var allTransformedPatterns = utils_1.map(onlyRelevantClasses, function (currClass) {
+	        return addStartOfInput(currClass[PATTERN]);
+	    });
+	    var allPatternsToClass = utils_1.zipObject(allTransformedPatterns, onlyRelevantClasses);
+	    var patternIdxToClass = utils_1.map(allTransformedPatterns, function (pattern) {
+	        return allPatternsToClass[pattern.toString()];
+	    });
+	    var patternIdxToGroup = utils_1.map(onlyRelevantClasses, function (clazz) {
+	        var groupName = clazz.GROUP;
+	        if (groupName === lexer_public_1.Lexer.SKIPPED) {
+	            return undefined;
+	        }
+	        else if (utils_1.isString(groupName)) {
+	            return groupName;
+	        }/* istanbul ignore else */ 
+	        else if (utils_1.isUndefined(groupName)) {
+	            return "default";
+	        }
+	        else {
+	            /* istanbul ignore next */ throw Error("non exhaustive match");
+	        }
+	    });
+	    var patternIdxToLongerAltIdx = utils_1.map(onlyRelevantClasses, function (clazz) {
+	        var longerAltClass = clazz.LONGER_ALT;
+	        if (longerAltClass) {
+	            var longerAltIdx = utils_1.indexOf(onlyRelevantClasses, longerAltClass);
+	            return longerAltIdx;
+	        }
+	    });
+	    var patternIdxToPushMode = utils_1.map(onlyRelevantClasses, function (clazz) { return clazz.PUSH_MODE; });
+	    var patternIdxToPopMode = utils_1.map(onlyRelevantClasses, function (clazz) { return utils_1.has(clazz, "POP_MODE"); });
+	    var patternIdxToCanLineTerminator = utils_1.map(allTransformedPatterns, function (pattern) {
+	        // TODO: unicode escapes of line terminators too?
+	        return /\\n|\\r|\\s/g.test(pattern.source);
+	    });
+	    var emptyGroups = utils_1.reduce(onlyRelevantClasses, function (acc, clazz) {
+	        var groupName = clazz.GROUP;
+	        if (utils_1.isString(groupName)) {
+	            acc[groupName] = [];
+	        }
+	        return acc;
+	    }, {});
+	    return {
+	        allPatterns: allTransformedPatterns,
+	        patternIdxToClass: patternIdxToClass,
+	        patternIdxToGroup: patternIdxToGroup,
+	        patternIdxToLongerAltIdx: patternIdxToLongerAltIdx,
+	        patternIdxToCanLineTerminator: patternIdxToCanLineTerminator,
+	        patternIdxToPushMode: patternIdxToPushMode,
+	        patternIdxToPopMode: patternIdxToPopMode,
+	        emptyGroups: emptyGroups
+	    };
+	}
+	exports.analyzeTokenClasses = analyzeTokenClasses;
+	function validatePatterns(tokenClasses, validModesNames) {
+	    var errors = [];
+	    var missingResult = findMissingPatterns(tokenClasses);
+	    var validTokenClasses = missingResult.valid;
+	    errors = errors.concat(missingResult.errors);
+	    var invalidResult = findInvalidPatterns(validTokenClasses);
+	    validTokenClasses = invalidResult.valid;
+	    errors = errors.concat(invalidResult.errors);
+	    errors = errors.concat(findEndOfInputAnchor(validTokenClasses));
+	    errors = errors.concat(findUnsupportedFlags(validTokenClasses));
+	    errors = errors.concat(findDuplicatePatterns(validTokenClasses));
+	    errors = errors.concat(findInvalidGroupType(validTokenClasses));
+	    errors = errors.concat(findModesThatDoNotExist(validTokenClasses, validModesNames));
+	    return errors;
+	}
+	exports.validatePatterns = validatePatterns;
+	function findMissingPatterns(tokenClasses) {
+	    var tokenClassesWithMissingPattern = utils_1.filter(tokenClasses, function (currClass) {
+	        return !utils_1.has(currClass, PATTERN);
+	    });
+	    var errors = utils_1.map(tokenClassesWithMissingPattern, function (currClass) {
+	        return {
+	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- missing static 'PATTERN' property",
+	            type: lexer_public_1.LexerDefinitionErrorType.MISSING_PATTERN,
+	            tokenClasses: [currClass]
+	        };
+	    });
+	    var valid = utils_1.difference(tokenClasses, tokenClassesWithMissingPattern);
+	    return { errors: errors, valid: valid };
+	}
+	exports.findMissingPatterns = findMissingPatterns;
+	function findInvalidPatterns(tokenClasses) {
+	    var tokenClassesWithInvalidPattern = utils_1.filter(tokenClasses, function (currClass) {
+	        var pattern = currClass[PATTERN];
+	        return !utils_1.isRegExp(pattern);
+	    });
+	    var errors = utils_1.map(tokenClassesWithInvalidPattern, function (currClass) {
+	        return {
+	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'PATTERN' can only be a RegExp",
+	            type: lexer_public_1.LexerDefinitionErrorType.INVALID_PATTERN,
+	            tokenClasses: [currClass]
+	        };
+	    });
+	    var valid = utils_1.difference(tokenClasses, tokenClassesWithInvalidPattern);
+	    return { errors: errors, valid: valid };
+	}
+	exports.findInvalidPatterns = findInvalidPatterns;
+	var end_of_input = /[^\\][\$]/;
+	function findEndOfInputAnchor(tokenClasses) {
+	    var invalidRegex = utils_1.filter(tokenClasses, function (currClass) {
+	        var pattern = currClass[PATTERN];
+	        return end_of_input.test(pattern.source);
+	    });
+	    var errors = utils_1.map(invalidRegex, function (currClass) {
+	        return {
+	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'PATTERN' cannot contain end of input anchor '$'",
+	            type: lexer_public_1.LexerDefinitionErrorType.EOI_ANCHOR_FOUND,
+	            tokenClasses: [currClass]
+	        };
+	    });
+	    return errors;
+	}
+	exports.findEndOfInputAnchor = findEndOfInputAnchor;
+	function findUnsupportedFlags(tokenClasses) {
+	    var invalidFlags = utils_1.filter(tokenClasses, function (currClass) {
+	        var pattern = currClass[PATTERN];
+	        return pattern instanceof RegExp && (pattern.multiline || pattern.global);
+	    });
+	    var errors = utils_1.map(invalidFlags, function (currClass) {
+	        return {
+	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) +
+	                "<- static 'PATTERN' may NOT contain global('g') or multiline('m')",
+	            type: lexer_public_1.LexerDefinitionErrorType.UNSUPPORTED_FLAGS_FOUND,
+	            tokenClasses: [currClass]
+	        };
+	    });
+	    return errors;
+	}
+	exports.findUnsupportedFlags = findUnsupportedFlags;
+	// This can only test for identical duplicate RegExps, not semantically equivalent ones.
+	function findDuplicatePatterns(tokenClasses) {
+	    var found = [];
+	    var identicalPatterns = utils_1.map(tokenClasses, function (outerClass) {
+	        return utils_1.reduce(tokenClasses, function (result, innerClass) {
+	            if ((outerClass.PATTERN.source === innerClass.PATTERN.source) && !utils_1.contains(found, innerClass) &&
+	                innerClass.PATTERN !== lexer_public_1.Lexer.NA) {
+	                // this avoids duplicates in the result, each class may only appear in one "set"
+	                // in essence we are creating Equivalence classes on equality relation.
+	                found.push(innerClass);
+	                result.push(innerClass);
+	                return result;
+	            }
+	            return result;
+	        }, []);
+	    });
+	    identicalPatterns = utils_1.compact(identicalPatterns);
+	    var duplicatePatterns = utils_1.filter(identicalPatterns, function (currIdenticalSet) {
+	        return currIdenticalSet.length > 1;
+	    });
+	    var errors = utils_1.map(duplicatePatterns, function (setOfIdentical) {
+	        var classNames = utils_1.map(setOfIdentical, function (currClass) {
+	            return tokens_public_1.tokenName(currClass);
+	        });
+	        var dupPatternSrc = utils_1.first(setOfIdentical).PATTERN;
+	        return {
+	            message: ("The same RegExp pattern ->" + dupPatternSrc + "<-") +
+	                ("has been used in all the following classes: " + classNames.join(", ") + " <-"),
+	            type: lexer_public_1.LexerDefinitionErrorType.DUPLICATE_PATTERNS_FOUND,
+	            tokenClasses: setOfIdentical
+	        };
+	    });
+	    return errors;
+	}
+	exports.findDuplicatePatterns = findDuplicatePatterns;
+	function findInvalidGroupType(tokenClasses) {
+	    var invalidTypes = utils_1.filter(tokenClasses, function (clazz) {
+	        if (!utils_1.has(clazz, "GROUP")) {
+	            return false;
+	        }
+	        var group = clazz.GROUP;
+	        return group !== lexer_public_1.Lexer.SKIPPED &&
+	            group !== lexer_public_1.Lexer.NA && !utils_1.isString(group);
+	    });
+	    var errors = utils_1.map(invalidTypes, function (currClass) {
+	        return {
+	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'GROUP' can only be Lexer.SKIPPED/Lexer.NA/A String",
+	            type: lexer_public_1.LexerDefinitionErrorType.INVALID_GROUP_TYPE_FOUND,
+	            tokenClasses: [currClass]
+	        };
+	    });
+	    return errors;
+	}
+	exports.findInvalidGroupType = findInvalidGroupType;
+	function findModesThatDoNotExist(tokenClasses, validModes) {
+	    var invalidModes = utils_1.filter(tokenClasses, function (clazz) {
+	        return clazz.PUSH_MODE !== undefined && !utils_1.contains(validModes, clazz.PUSH_MODE);
+	    });
+	    var errors = utils_1.map(invalidModes, function (clazz) {
+	        var msg = ("Token class: ->" + tokens_public_1.tokenName(clazz) + "<- static 'PUSH_MODE' value cannot refer to a Lexer Mode ->" + clazz.PUSH_MODE + "<-") +
+	            "which does not exist";
+	        return {
+	            message: msg,
+	            type: lexer_public_1.LexerDefinitionErrorType.PUSH_MODE_DOES_NOT_EXIST,
+	            tokenClasses: [clazz]
+	        };
+	    });
+	    return errors;
+	}
+	exports.findModesThatDoNotExist = findModesThatDoNotExist;
+	function addStartOfInput(pattern) {
+	    var flags = pattern.ignoreCase ?
+	        "i" :
+	        "";
+	    // always wrapping in a none capturing group preceded by '^' to make sure matching can only work on start of input.
+	    // duplicate/redundant start of input markers have no meaning (/^^^^A/ === /^A/)
+	    return new RegExp("^(?:" + pattern.source + ")", flags);
+	}
+	exports.addStartOfInput = addStartOfInput;
+	function countLineTerminators(text) {
+	    var lineTerminators = 0;
+	    var currOffset = 0;
+	    while (currOffset < text.length) {
+	        var c = text.charCodeAt(currOffset);
+	        if (c === 10) {
+	            lineTerminators++;
+	        }
+	        else if (c === 13) {
+	            if (currOffset !== text.length - 1 &&
+	                text.charCodeAt(currOffset + 1) === 10) {
+	            }
+	            else {
+	                lineTerminators++;
+	            }
+	        }
+	        currOffset++;
+	    }
+	    return lineTerminators;
+	}
+	exports.countLineTerminators = countLineTerminators;
+	function performRuntimeChecks(lexerDefinition) {
+	    var errors = [];
+	    // some run time checks to help the end users.
+	    if (!utils_1.has(lexerDefinition, exports.DEFAULT_MODE)) {
+	        errors.push({
+	            message: "A MultiMode Lexer cannot be initialized without a <" + exports.DEFAULT_MODE + "> property in its definition\n",
+	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE
+	        });
+	    }
+	    if (!utils_1.has(lexerDefinition, exports.MODES)) {
+	        errors.push({
+	            message: "A MultiMode Lexer cannot be initialized without a <" + exports.MODES + "> property in its definition\n",
+	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY
+	        });
+	    }
+	    if (utils_1.has(lexerDefinition, exports.MODES) &&
+	        utils_1.has(lexerDefinition, exports.DEFAULT_MODE) && !utils_1.has(lexerDefinition.modes, lexerDefinition.defaultMode)) {
+	        errors.push({
+	            message: ("A MultiMode Lexer cannot be initialized with a " + exports.DEFAULT_MODE + ": <" + lexerDefinition.defaultMode + ">")
+	                + "which does not exist\n",
+	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST
+	        });
+	    }
+	    if (utils_1.has(lexerDefinition, exports.MODES)) {
+	        utils_1.forEach(lexerDefinition.modes, function (currModeValue, currModeName) {
+	            utils_1.forEach(currModeValue, function (currTokClass, currIdx) {
+	                if (utils_1.isUndefined(currTokClass)) {
+	                    errors.push({
+	                        message: "A Lexer cannot be initialized using an undefined Token Class. Mode:" +
+	                            ("<" + currModeName + "> at index: <" + currIdx + ">\n"),
+	                        type: lexer_public_1.LexerDefinitionErrorType.LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED
+	                    });
+	                }
+	            });
+	            // lexerDefinition.modes[currModeName] = reject<Function>(currModeValue, (currTokClass) => isUndefined(currTokClass))
+	        });
+	    }
+	    return errors;
+	}
+	exports.performRuntimeChecks = performRuntimeChecks;
+	function checkLazyMode(allTokenTypes) {
+	    var errors = [];
+	    var allTokensTypeSet = utils_1.uniq(allTokenTypes, function (currTokType) { return tokens_public_1.tokenName(currTokType); });
+	    var areAllLazy = utils_1.every(allTokensTypeSet, function (currTokType) { return tokens_1.isLazyTokenType(currTokType); });
+	    // TODO: why is this second check required?
+	    var areAllNotLazy = utils_1.every(allTokensTypeSet, function (currTokType) { return !tokens_1.isLazyTokenType(currTokType); });
+	    if (!areAllLazy && !areAllNotLazy) {
+	        var lazyTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return tokens_1.isLazyTokenType(currTokType); });
+	        var lazyTokensNames = utils_1.map(lazyTokens, tokens_public_1.tokenName);
+	        var lazyTokensString = lazyTokensNames.join("\n\t");
+	        var notLazyTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return !tokens_1.isLazyTokenType(currTokType); });
+	        var notLazyTokensNames = utils_1.map(notLazyTokens, tokens_public_1.tokenName);
+	        var notLazyTokensString = notLazyTokensNames.join("\n\t");
+	        errors.push({
+	            message: "A Lexer cannot be defined using a mix of both Lazy and Non-Lazy Tokens:\n" +
+	                "Lazy Tokens:\n\t" +
+	                lazyTokensString +
+	                "\nNon-Lazy Tokens:\n\t" +
+	                notLazyTokensString,
+	            type: lexer_public_1.LexerDefinitionErrorType.LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY
+	        });
+	    }
+	    return {
+	        isLazy: areAllLazy,
+	        errors: errors
+	    };
+	}
+	exports.checkLazyMode = checkLazyMode;
+	function checkSimpleMode(allTokenTypes) {
+	    var errors = [];
+	    var allTokensTypeSet = utils_1.uniq(allTokenTypes, function (currTokType) { return tokens_public_1.tokenName(currTokType); });
+	    var areAllSimple = utils_1.every(allTokensTypeSet, function (currTokType) { return tokens_1.isSimpleTokenType(currTokType); });
+	    // TODO: why is the second check required?
+	    var areAllNotSimple = utils_1.every(allTokensTypeSet, function (currTokType) { return !tokens_1.isSimpleTokenType(currTokType); });
+	    if (!areAllSimple && !areAllNotSimple) {
+	        var simpleTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return tokens_1.isSimpleTokenType(currTokType); });
+	        var simpleTokensNames = utils_1.map(simpleTokens, tokens_public_1.tokenName);
+	        var simpleTokensString = simpleTokensNames.join("\n\t");
+	        var notSimpleTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return !tokens_1.isSimpleTokenType(currTokType); });
+	        var notSimpleTokensNames = utils_1.map(notSimpleTokens, tokens_public_1.tokenName);
+	        var notSimpleTokensString = notSimpleTokensNames.join("\n\t");
+	        errors.push({
+	            message: "A Lexer cannot be defined using a mix of both Simple and Non-Simple Tokens:\n" +
+	                "Simple Tokens:\n\t" +
+	                simpleTokensString +
+	                "\nNon-Simple Tokens:\n\t" +
+	                notSimpleTokensString,
+	            type: lexer_public_1.LexerDefinitionErrorType.LEXER_DEFINITION_CANNOT_MIX_SIMPLE_AND_NOT_SIMPLE
+	        });
+	    }
+	    return {
+	        isSimple: areAllSimple,
+	        errors: errors
+	    };
+	}
+	exports.checkSimpleMode = checkSimpleMode;
+	function cloneEmptyGroups(emptyGroups) {
+	    var clonedResult = {};
+	    var groupKeys = utils_1.keys(emptyGroups);
+	    utils_1.forEach(groupKeys, function (currKey) {
+	        var currGroupValue = emptyGroups[currKey];
+	        /* istanbul ignore else */
+	        if (utils_1.isArray(currGroupValue)) {
+	            clonedResult[currKey] = [];
+	        }
+	        else {
+	            /* istanbul ignore next */ throw Error("non exhaustive match");
+	        }
+	    });
+	    return clonedResult;
+	}
+	exports.cloneEmptyGroups = cloneEmptyGroups;
+
+
+/***/ },
+/* 11 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	var utils_1 = __webpack_require__(4);
+	var tokens_public_1 = __webpack_require__(8);
+	var lang_extensions_1 = __webpack_require__(3);
+	function fillUpLineToOffset(lineToOffset, text) {
+	    var currLine = 0;
+	    var currOffset = 0;
+	    // line 1 (idx 0 in the array) always starts at offset 0
+	    lineToOffset.push(0);
+	    while (currOffset < text.length) {
+	        var c = text.charCodeAt(currOffset);
+	        if (c === 10) {
+	            currLine++;
+	            // +1 because the next line starts only AFTER the "\n"
+	            lineToOffset.push(currOffset + 1);
+	        }
+	        else if (c === 13) {
+	            if (currOffset !== text.length - 1 &&
+	                text.charCodeAt(currOffset + 1) === 10) {
+	                // +2 because the next line starts only AFTER the "\r\n"
+	                lineToOffset.push(currOffset + 2);
+	                // "consume" two chars
+	                currOffset++;
+	            }
+	            else {
+	                currLine++;
+	                // +1 because the next line starts only AFTER the "\r"
+	                lineToOffset.push(currOffset + 1);
+	            }
+	        }
+	        currOffset++;
+	    }
+	    // to make the data structure consistent
+	    lineToOffset.push(Infinity);
+	}
+	exports.fillUpLineToOffset = fillUpLineToOffset;
+	function getStartLineFromLineToOffset(startOffset, lineToOffset) {
+	    return findLineOfOffset(startOffset, lineToOffset);
+	}
+	exports.getStartLineFromLineToOffset = getStartLineFromLineToOffset;
+	function getEndLineFromLineToOffset(endOffset, lineToOffset) {
+	    return findLineOfOffset(endOffset, lineToOffset);
+	}
+	exports.getEndLineFromLineToOffset = getEndLineFromLineToOffset;
+	function getStartColumnFromLineToOffset(startOffset, lineToOffset) {
+	    return findColumnOfOffset(startOffset, lineToOffset);
+	}
+	exports.getStartColumnFromLineToOffset = getStartColumnFromLineToOffset;
+	function getEndColumnFromLineToOffset(endOffset, lineToOffset) {
+	    // none inclusive
+	    return findColumnOfOffset(endOffset, lineToOffset);
+	}
+	exports.getEndColumnFromLineToOffset = getEndColumnFromLineToOffset;
+	/**
+	 *  Modification of a binary search to seek
+	 */
+	function findLineOfOffset(targetOffset, lineToOffset) {
+	    var lowIdx = 0;
+	    var highIdx = lineToOffset.length - 1;
+	    var found = false;
+	    var line = -1;
+	    while (!found) {
+	        var middleIdx = Math.floor((highIdx + lowIdx) / 2);
+	        var middleOffset = lineToOffset[middleIdx];
+	        var middleNextOffset = lineToOffset[middleIdx + 1];
+	        if (middleOffset <= targetOffset &&
+	            middleNextOffset > targetOffset) {
+	            found = true;
+	            line = middleIdx;
+	        }
+	        else if (middleOffset > targetOffset) {
+	            highIdx = middleIdx;
+	        }
+	        else if (middleNextOffset < targetOffset) {
+	            lowIdx = middleIdx;
+	        }/* istanbul ignore else */ 
+	        else if (middleNextOffset === targetOffset) {
+	            found = true;
+	            line = middleIdx + 1;
+	        }
+	        else {
+	            /* istanbul ignore next */ throw Error("non exhaustive match");
+	        }
+	    }
+	    // +1 because lines are counted from 1 while array indices are zero based.
+	    return line + 1;
+	}
+	function findColumnOfOffset(offset, lineToOffset) {
+	    var line = findLineOfOffset(offset, lineToOffset);
+	    // +1 because columns always start at 1
+	    return offset - lineToOffset[line - 1] + 1;
+	}
+	function tokenStructuredMatcher(tokInstance, tokConstructor) {
+	    if (tokInstance.tokenType === tokConstructor.tokenType) {
+	        return true;
+	    }
+	    else if (tokConstructor.extendingTokenTypes.length > 0) {
+	        var extendingTokenTypes = tokConstructor.extendingTokenTypes;
+	        var extendingTokenTypesLength = extendingTokenTypes.length;
+	        for (var i = 0; i < extendingTokenTypesLength; i++) {
+	            if (extendingTokenTypes[i] === tokInstance.tokenType) {
+	                return true;
+	            }
+	        }
+	        return false;
+	    }
+	    else {
+	        return false;
+	    }
+	}
+	exports.tokenStructuredMatcher = tokenStructuredMatcher;
+	function tokenInstanceofMatcher(tokInstance, tokConstructor) {
+	    return tokInstance instanceof tokConstructor;
+	}
+	exports.tokenInstanceofMatcher = tokenInstanceofMatcher;
+	function tokenClassIdentity(tokenConstructor) {
+	    // return tokenName(tokenConstructor)
+	    return tokenConstructor.tokenType;
+	}
+	exports.tokenClassIdentity = tokenClassIdentity;
+	function tokenInstanceIdentity(tokenInstance) {
+	    return tokenInstance.constructor.tokenType;
+	}
+	exports.tokenInstanceIdentity = tokenInstanceIdentity;
+	function tokenStructuredIdentity(token) {
+	    return token.tokenType;
+	}
+	exports.tokenStructuredIdentity = tokenStructuredIdentity;
+	function isBaseTokenOrObject(tokClass) {
+	    return isBaseTokenClass(tokClass) || tokClass === Object;
+	}
+	exports.isBaseTokenOrObject = isBaseTokenOrObject;
+	function isBaseTokenClass(tokClass) {
+	    return tokClass === tokens_public_1.Token || tokClass === tokens_public_1.LazyToken || tokClass === tokens_public_1.SimpleLazyToken;
+	}
+	exports.isBaseTokenClass = isBaseTokenClass;
+	exports.tokenShortNameIdx = 1;
+	exports.tokenIdxToClass = new lang_extensions_1.HashTable();
+	function augmentTokenClasses(tokenClasses) {
+	    // 1. collect the parent Token classes as well.
+	    var tokenClassesAndParents = expandTokenHierarchy(tokenClasses);
+	    // 2. add required tokenType and extendingTokenTypes properties
+	    assignTokenDefaultProps(tokenClassesAndParents);
+	    // 3. fill up the extendingTokenTypes
+	    assignExtendingTokensProp(tokenClassesAndParents);
+	}
+	exports.augmentTokenClasses = augmentTokenClasses;
+	function expandTokenHierarchy(tokenClasses) {
+	    var tokenClassesAndParents = utils_1.cloneArr(tokenClasses);
+	    utils_1.forEach(tokenClasses, function (currTokClass) {
+	        var currParentClass = utils_1.getSuperClass(currTokClass);
+	        while (!isBaseTokenOrObject(currParentClass)) {
+	            if (!utils_1.contains(tokenClassesAndParents, currParentClass)) {
+	                tokenClassesAndParents.push(currParentClass);
+	            }
+	            currParentClass = utils_1.getSuperClass(currParentClass);
+	        }
+	    });
+	    return tokenClassesAndParents;
+	}
+	exports.expandTokenHierarchy = expandTokenHierarchy;
+	function assignTokenDefaultProps(tokenClasses) {
+	    utils_1.forEach(tokenClasses, function (currTokClass) {
+	        if (!hasShortKeyProperty(currTokClass)) {
+	            exports.tokenIdxToClass.put(exports.tokenShortNameIdx, currTokClass);
+	            currTokClass.tokenType = exports.tokenShortNameIdx++;
+	        }
+	        if (!hasExtendingTokensTypesProperty(currTokClass)) {
+	            currTokClass.extendingTokenTypes = [];
+	        }
+	    });
+	}
+	exports.assignTokenDefaultProps = assignTokenDefaultProps;
+	function assignExtendingTokensProp(tokenClasses) {
+	    utils_1.forEach(tokenClasses, function (currTokClass) {
+	        var currSubClassesExtendingTypes = [currTokClass.tokenType];
+	        var currParentClass = utils_1.getSuperClass(currTokClass);
+	        while (!isBaseTokenClass(currParentClass) && currParentClass !== Object) {
+	            var newExtendingTypes = utils_1.difference(currSubClassesExtendingTypes, currParentClass.extendingTokenTypes);
+	            currParentClass.extendingTokenTypes = currParentClass.extendingTokenTypes.concat(newExtendingTypes);
+	            currSubClassesExtendingTypes.push(currParentClass.tokenType);
+	            currParentClass = utils_1.getSuperClass(currParentClass);
+	        }
+	    });
+	}
+	exports.assignExtendingTokensProp = assignExtendingTokensProp;
+	function hasShortKeyProperty(tokClass) {
+	    return utils_1.has(tokClass, "tokenType");
+	}
+	exports.hasShortKeyProperty = hasShortKeyProperty;
+	function hasExtendingTokensTypesProperty(tokClass) {
+	    return utils_1.has(tokClass, "extendingTokenTypes");
+	}
+	exports.hasExtendingTokensTypesProperty = hasExtendingTokensTypesProperty;
+	function createSimpleLazyToken(startOffset, endOffset, tokClass, cacheData) {
+	    return {
+	        startOffset: startOffset,
+	        endOffset: endOffset,
+	        tokenType: tokClass.tokenType,
+	        cacheData: cacheData
+	    };
+	}
+	exports.createSimpleLazyToken = createSimpleLazyToken;
+	function createLazyTokenInstance(startOffset, endOffset, tokClass, cacheData) {
+	    return new tokClass(startOffset, endOffset, cacheData);
+	}
+	exports.createLazyTokenInstance = createLazyTokenInstance;
+	function isInheritanceBasedToken(token) {
+	    return token instanceof tokens_public_1.Token || token instanceof tokens_public_1.LazyToken;
+	}
+	exports.isInheritanceBasedToken = isInheritanceBasedToken;
+	function getImageFromLazyToken(lazyToken) {
+	    if (lazyToken.isInsertedInRecovery) {
+	        return "";
+	    }
+	    return lazyToken.cacheData.orgText.substring(lazyToken.startOffset, lazyToken.endOffset + 1);
+	}
+	exports.getImageFromLazyToken = getImageFromLazyToken;
+	function getStartLineFromLazyToken(lazyToken) {
+	    if (lazyToken.isInsertedInRecovery) {
+	        return NaN;
+	    }
+	    ensureLineDataProcessing(lazyToken.cacheData);
+	    return getStartLineFromLineToOffset(lazyToken.startOffset, lazyToken.cacheData.lineToOffset);
+	}
+	exports.getStartLineFromLazyToken = getStartLineFromLazyToken;
+	function getStartColumnFromLazyToken(lazyToken) {
+	    if (lazyToken.isInsertedInRecovery) {
+	        return NaN;
+	    }
+	    ensureLineDataProcessing(lazyToken.cacheData);
+	    return getStartColumnFromLineToOffset(lazyToken.startOffset, lazyToken.cacheData.lineToOffset);
+	}
+	exports.getStartColumnFromLazyToken = getStartColumnFromLazyToken;
+	function getEndLineFromLazyToken(lazyToken) {
+	    if (lazyToken.isInsertedInRecovery) {
+	        return NaN;
+	    }
+	    ensureLineDataProcessing(lazyToken.cacheData);
+	    return getEndLineFromLineToOffset(lazyToken.endOffset, lazyToken.cacheData.lineToOffset);
+	}
+	exports.getEndLineFromLazyToken = getEndLineFromLazyToken;
+	function getEndColumnFromLazyToken(lazyToken) {
+	    if (lazyToken.isInsertedInRecovery) {
+	        return NaN;
+	    }
+	    ensureLineDataProcessing(lazyToken.cacheData);
+	    return getEndColumnFromLineToOffset(lazyToken.endOffset, lazyToken.cacheData.lineToOffset);
+	}
+	exports.getEndColumnFromLazyToken = getEndColumnFromLazyToken;
+	function ensureLineDataProcessing(cacheData) {
+	    if (utils_1.isEmpty(cacheData.lineToOffset)) {
+	        fillUpLineToOffset(cacheData.lineToOffset, cacheData.orgText);
+	    }
+	}
+	exports.ensureLineDataProcessing = ensureLineDataProcessing;
+	function isLazyTokenType(tokType) {
+	    return tokens_public_1.LazyToken.prototype.isPrototypeOf(tokType.prototype) ||
+	        tokens_public_1.SimpleLazyToken.prototype.isPrototypeOf(tokType.prototype);
+	}
+	exports.isLazyTokenType = isLazyTokenType;
+	function isSimpleTokenType(tokType) {
+	    return tokens_public_1.SimpleLazyToken.prototype.isPrototypeOf(tokType.prototype);
+	}
+	exports.isSimpleTokenType = isSimpleTokenType;
+
+
+/***/ },
+/* 12 */
+/***/ function(module, exports, __webpack_require__) {
+
+	"use strict";
+	var __extends = (this && this.__extends) || function (d, b) {
+	    for (var p in b) /* istanbul ignore next */  if (b.hasOwnProperty(p)) d[p] = b[p];
+	    function __() { this.constructor = d; }
+	    /* istanbul ignore next */  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+	};
 	var utils = __webpack_require__(4);
 	var utils_1 = __webpack_require__(4);
 	var parser_public_1 = __webpack_require__(1);
 	var gast_public_1 = __webpack_require__(7);
-	var gast_1 = __webpack_require__(9);
-	var tokens_public_1 = __webpack_require__(10);
+	var gast_1 = __webpack_require__(13);
+	var tokens_public_1 = __webpack_require__(8);
 	var first_1 = __webpack_require__(14);
 	var lookahead_1 = __webpack_require__(15);
 	function validateGrammar(topLevels, maxLookahead, ignoredIssues) {
@@ -2843,7 +4570,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 9 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
@@ -2994,1212 +4721,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 10 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	var __extends = (this && this.__extends) || function (d, b) {
-	    for (var p in b) /* istanbul ignore next */  if (b.hasOwnProperty(p)) d[p] = b[p];
-	    function __() { this.constructor = d; }
-	    /* istanbul ignore next */  d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-	};
-	var utils_1 = __webpack_require__(4);
-	var lang_extensions_1 = __webpack_require__(3);
-	var lexer_public_1 = __webpack_require__(11);
-	var tokens_1 = __webpack_require__(13);
-	/**
-	 *  This can be used to improve the quality/readability of error messages or syntax diagrams.
-	 *
-	 * @param {Function} clazz - A constructor for a Token subclass
-	 * @returns {string} - The Human readable label a Token if it exists.
-	 */
-	function tokenLabel(clazz) {
-	    if (hasTokenLabel(clazz)) {
-	        return clazz.LABEL;
-	    }
-	    else {
-	        return tokenName(clazz);
-	    }
-	}
-	exports.tokenLabel = tokenLabel;
-	function hasTokenLabel(clazz) {
-	    return utils_1.isString(clazz.LABEL) && clazz.LABEL !== "";
-	}
-	exports.hasTokenLabel = hasTokenLabel;
-	function tokenName(clazz) {
-	    // The tokenName property is needed under some old versions of node.js (0.10/0.12)
-	    // where the Function.prototype.name property is not defined as a 'configurable' property
-	    // enable producing readable error messages.
-	    /* istanbul ignore if -> will only run in old versions of node.js */
-	    if (utils_1.isString(clazz.tokenName)) {
-	        return clazz.tokenName;
-	    }
-	    else {
-	        return lang_extensions_1.functionName(clazz);
-	    }
-	}
-	exports.tokenName = tokenName;
-	function extendLazyToken(tokenName, patternOrParent, parentConstructor) {
-	    if (patternOrParent === void 0) { patternOrParent = undefined; }
-	    if (parentConstructor === void 0) { parentConstructor = LazyToken; }
-	    return extendToken(tokenName, patternOrParent, parentConstructor);
-	}
-	exports.extendLazyToken = extendLazyToken;
-	/**
-	 * utility to help the poor souls who are still stuck writing pure javascript 5.1
-	 * extend and create Token subclasses in a less verbose manner
-	 *
-	 * @param {string} tokenName - The name of the new TokenClass
-	 * @param {RegExp|Function} patternOrParent - RegExp Pattern or Parent Token Constructor
-	 * @param {Function} parentConstructor - The Token class to be extended
-	 * @returns {Function} - A constructor for the new extended Token subclass
-	 */
-	function extendToken(tokenName, patternOrParent, parentConstructor) {
-	    if (patternOrParent === void 0) { patternOrParent = undefined; }
-	    if (parentConstructor === void 0) { parentConstructor = Token; }
-	    var pattern;
-	    if (utils_1.isRegExp(patternOrParent) ||
-	        patternOrParent === lexer_public_1.Lexer.SKIPPED ||
-	        patternOrParent === lexer_public_1.Lexer.NA) {
-	        pattern = patternOrParent;
-	    }
-	    else if (utils_1.isFunction(patternOrParent)) {
-	        parentConstructor = patternOrParent;
-	        pattern = undefined;
-	    }
-	    var derivedCostructor = function () {
-	        parentConstructor.apply(this, arguments);
-	    };
-	    // static properties mixing
-	    derivedCostructor = utils_1.assign(derivedCostructor, parentConstructor);
-	    // can be overwritten according to:
-	    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/
-	    // name?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FFunction%2Fname
-	    /* istanbul ignore if -> will only run in old versions of node.js */
-	    if (!lang_extensions_1.defineNameProp(derivedCostructor, tokenName)) {
-	        // hack to save the tokenName in situations where the constructor's name property cannot be reconfigured
-	        derivedCostructor.tokenName = tokenName;
-	    }
-	    derivedCostructor.prototype = Object.create(parentConstructor.prototype);
-	    derivedCostructor.prototype.constructor = derivedCostructor;
-	    if (!utils_1.isUndefined(pattern)) {
-	        derivedCostructor.PATTERN = pattern;
-	    }
-	    return derivedCostructor;
-	}
-	exports.extendToken = extendToken;
-	var Token = (function () {
-	    /**
-	     * @param {string} image - The textual representation of the Token as it appeared in the text.
-	     * @param {number} startOffset - Offset of the first character of the Token.
-	     * @param {number} startLine - Line of the first character of the Token.
-	     * @param {number} startColumn - Column of the first character of the Token.
-	     * @param {number} endLine - Line of the last character of the Token.
-	     * @param {number} endColumn - Column of the last character of the Token.
-	     */
-	    function Token(image, startOffset, startLine, startColumn, endLine, endColumn) {
-	        if (endLine === void 0) { endLine = startLine; }
-	        if (endColumn === void 0) { endColumn = startColumn + image.length - 1; }
-	        this.image = image;
-	        this.startOffset = startOffset;
-	        this.startLine = startLine;
-	        this.startColumn = startColumn;
-	        this.endLine = endLine;
-	        this.endColumn = endColumn;
-	        // this marks if a Token does not really exist and has been inserted "artificially" during parsing in rule error recovery
-	        this.isInsertedInRecovery = false;
-	    }
-	    Object.defineProperty(Token.prototype, "endOffset", {
-	        get: function () {
-	            return this.startOffset + this.image.length - 1;
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    Object.defineProperty(Token.prototype, "offset", {
-	        /**
-	         * @deprecated
-	         * An Alias for getting the startOffset. this is deprecated and remains only to be backwards compatiable.
-	         * This API will be removed in future version of Chevrotain.
-	         */
-	        get: function () {
-	            return this.startOffset;
-	        },
-	        /**
-	         * @deprecated
-	         * An Alias for setting the startOffset. this is deprecated and remains only to be backwards compatiable.
-	         * This API will be removed in future version of Chevrotain.
-	         */
-	        set: function (newOffset) {
-	            this.startOffset = newOffset;
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    /**
-	     * A "human readable" Label for a Token.
-	     * Subclasses of Token may define their own static LABEL property.
-	     * This label will be used in error messages and drawing syntax diagrams.
-	     *
-	     * For example a Token constructor may be called LCurly, which is short for LeftCurlyBrackets, These names are either too short
-	     * or too unwieldy to be used in error messages.
-	     *
-	     * Imagine : "expecting LCurly but found ')'" or "expecting LeftCurlyBrackets but found ')'"
-	     *
-	     * However if a static property LABEL with the value '{' exists on LCurly class, that error message will be:
-	     * "expecting '{' but found ')'"
-	     */
-	    Token.LABEL = undefined;
-	    return Token;
-	}());
-	exports.Token = Token;
-	/**
-	 * @see IToken
-	 * @see Token
-	 *
-	 * Same API as a IToken, using a Lazy implementation, with most properties being immutable.
-	 * See related doc in: https://github.com/SAP/chevrotain/blob/startO/docs/faq.md#-how-do-i-maximize-my-parsers-performance
-	 * ("Use Lazy Tokens" section)
-	 */
-	var LazyToken = (function () {
-	    function LazyToken(startOffset, endOffset, cacheData) {
-	        this.startOffset = startOffset;
-	        this.endOffset = endOffset;
-	        this.cacheData = cacheData;
-	    }
-	    Object.defineProperty(LazyToken.prototype, "image", {
-	        get: function () {
-	            if (this.isInsertedInRecovery) {
-	                return "";
-	            }
-	            return this.cacheData.orgText.substring(this.startOffset, this.endOffset + 1);
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    Object.defineProperty(LazyToken.prototype, "startLine", {
-	        get: function () {
-	            if (this.isInsertedInRecovery) {
-	                return NaN;
-	            }
-	            this.ensureLineDataProcessing();
-	            return tokens_1.getStartLineFromLineToOffset(this.startOffset, this.cacheData.lineToOffset);
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    Object.defineProperty(LazyToken.prototype, "startColumn", {
-	        get: function () {
-	            if (this.isInsertedInRecovery) {
-	                return NaN;
-	            }
-	            this.ensureLineDataProcessing();
-	            return tokens_1.getStartColumnFromLineToOffset(this.startOffset, this.cacheData.lineToOffset);
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    Object.defineProperty(LazyToken.prototype, "endLine", {
-	        get: function () {
-	            if (this.isInsertedInRecovery) {
-	                return NaN;
-	            }
-	            this.ensureLineDataProcessing();
-	            return tokens_1.getEndLineFromLineToOffset(this.endOffset, this.cacheData.lineToOffset);
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    Object.defineProperty(LazyToken.prototype, "endColumn", {
-	        get: function () {
-	            if (this.isInsertedInRecovery) {
-	                return NaN;
-	            }
-	            this.ensureLineDataProcessing();
-	            return tokens_1.getEndColumnFromLineToOffset(this.endOffset, this.cacheData.lineToOffset);
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	    LazyToken.prototype.ensureLineDataProcessing = function () {
-	        if (utils_1.isEmpty(this.cacheData.lineToOffset)) {
-	            tokens_1.fillUpLineToOffset(this.cacheData.lineToOffset, this.cacheData.orgText);
-	        }
-	    };
-	    /**
-	     * A "human readable" Label for a Token.
-	     * Subclasses of Token may define their own static LABEL property.
-	     * This label will be used in error messages and drawing syntax diagrams.
-	     *
-	     * For example a Token constructor may be called LCurly, which is short for LeftCurlyBrackets, These names are either too short
-	     * or too unwieldy to be used in error messages.
-	     *
-	     * Imagine : "expecting LCurly but found ')'" or "expecting LeftCurlyBrackets but found ')'"
-	     *
-	     * However if a static property LABEL with the value '{' exists on LCurly class, that error message will be:
-	     * "expecting '{' but found ')'"
-	     */
-	    LazyToken.LABEL = undefined;
-	    return LazyToken;
-	}());
-	exports.LazyToken = LazyToken;
-	/**
-	 * A special kind of Token which does not really exist in the input
-	 * (hence the 'Virtual' prefix). These type of Tokens can be used as special markers:
-	 * for example, EOF (end-of-file).
-	 */
-	var VirtualToken = (function (_super) {
-	    __extends(VirtualToken, _super);
-	    function VirtualToken() {
-	        _super.call(this, "", NaN, NaN, NaN, NaN, NaN);
-	    }
-	    return VirtualToken;
-	}(Token));
-	exports.VirtualToken = VirtualToken;
-	var EOF = (function (_super) {
-	    __extends(EOF, _super);
-	    function EOF() {
-	        _super.apply(this, arguments);
-	    }
-	    return EOF;
-	}(VirtualToken));
-	exports.EOF = EOF;
-
-
-/***/ },
-/* 11 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	var lexer_1 = __webpack_require__(12);
-	var utils_1 = __webpack_require__(4);
-	var tokens_1 = __webpack_require__(13);
-	(function (LexerDefinitionErrorType) {
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["MISSING_PATTERN"] = 0] = "MISSING_PATTERN";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["INVALID_PATTERN"] = 1] = "INVALID_PATTERN";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["EOI_ANCHOR_FOUND"] = 2] = "EOI_ANCHOR_FOUND";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["UNSUPPORTED_FLAGS_FOUND"] = 3] = "UNSUPPORTED_FLAGS_FOUND";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["DUPLICATE_PATTERNS_FOUND"] = 4] = "DUPLICATE_PATTERNS_FOUND";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["INVALID_GROUP_TYPE_FOUND"] = 5] = "INVALID_GROUP_TYPE_FOUND";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["PUSH_MODE_DOES_NOT_EXIST"] = 6] = "PUSH_MODE_DOES_NOT_EXIST";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE"] = 7] = "MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY"] = 8] = "MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST"] = 9] = "MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED"] = 10] = "LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED";
-	    LexerDefinitionErrorType[LexerDefinitionErrorType["LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY"] = 11] = "LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY";
-	})(exports.LexerDefinitionErrorType || (exports.LexerDefinitionErrorType = {}));
-	var LexerDefinitionErrorType = exports.LexerDefinitionErrorType;
-	var Lexer = (function () {
-	    /**
-	     * @param {SingleModeLexerDefinition | IMultiModeLexerDefinition} lexerDefinition -
-	     *  Structure composed of constructor functions for the Tokens types this lexer will support.
-	     *
-	     *  In the case of {SingleModeLexerDefinition} the structure is simply an array of Token constructors.
-	     *  In the case of {IMultiModeLexerDefinition} the structure is an object with two properties:
-	     *    1. a "modes" property where each value is an array of Token.
-	     *    2. a "defaultMode" property specifying the initial lexer mode.
-	     *
-	     *  constructors.
-	     *
-	     *  for example:
-	     *  {
-	     *     "modes" : {
-	     *     "modeX" : [Token1, Token2]
-	     *     "modeY" : [Token3, Token4]
-	     *     }
-	     *
-	     *     "defaultMode" : "modeY"
-	     *  }
-	     *
-	     *  A lexer with {MultiModesDefinition} is simply multiple Lexers where only one (mode) can be active at the same time.
-	     *  This is useful for lexing languages where there are different lexing rules depending on context.
-	     *
-	     *  The current lexing mode is selected via a "mode stack".
-	     *  The last (peek) value in the stack will be the current mode of the lexer.
-	     *
-	     *  Each Token class can define that it will cause the Lexer to (after consuming an instance of the Token):
-	     *  1. PUSH_MODE : push a new mode to the "mode stack"
-	     *  2. POP_MODE  : pop the last mode from the "mode stack"
-	     *
-	     *  Examples:
-	     *       export class Attribute extends Token {
-	     *          static PATTERN = ...
-	     *          static PUSH_MODE = "modeY"
-	     *       }
-	     *
-	     *       export class EndAttribute extends Token {
-	     *          static PATTERN = ...
-	     *          static POP_MODE = true
-	     *       }
-	     *
-	     *  The Token constructors must be in one of these forms:
-	     *
-	     *  1. With a PATTERN property that has a RegExp value for tokens to match:
-	     *     example: -->class Integer extends Token { static PATTERN = /[1-9]\d }<--
-	     *
-	     *  2. With a PATTERN property that has the value of the var Lexer.NA defined above.
-	     *     This is a convenience form used to avoid matching Token classes that only act as categories.
-	     *     example: -->class Keyword extends Token { static PATTERN = NA }<--
-	     *
-	     *
-	     *   The following RegExp patterns are not supported:
-	     *   a. '$' for match at end of input
-	     *   b. /b global flag
-	     *   c. /m multi-line flag
-	     *
-	     *   The Lexer will identify the first pattern that matches, Therefor the order of Token Constructors may be significant.
-	     *   For example when one pattern may match a prefix of another pattern.
-	     *
-	     *   Note that there are situations in which we may wish to order the longer pattern after the shorter one.
-	     *   For example: keywords vs Identifiers.
-	     *   'do'(/do/) and 'donald'(/w+)
-	     *
-	     *   * If the Identifier pattern appears before the 'do' pattern, both 'do' and 'donald'
-	     *     will be lexed as an Identifier.
-	     *
-	     *   * If the 'do' pattern appears before the Identifier pattern 'do' will be lexed correctly as a keyword.
-	     *     however 'donald' will be lexed as TWO separate tokens: keyword 'do' and identifier 'nald'.
-	     *
-	     *   To resolve this problem, add a static property on the keyword's constructor named: LONGER_ALT
-	     *   example:
-	     *
-	     *       export class Identifier extends Keyword { static PATTERN = /[_a-zA-Z][_a-zA-Z0-9]/ }
-	     *       export class Keyword extends Token {
-	     *          static PATTERN = lex.NA
-	     *          static LONGER_ALT = Identifier
-	     *       }
-	     *       export class Do extends Keyword { static PATTERN = /do/ }
-	     *       export class While extends Keyword { static PATTERN = /while/ }
-	     *       export class Return extends Keyword { static PATTERN = /return/ }
-	     *
-	     *   The lexer will then also attempt to match a (longer) Identifier each time a keyword is matched.
-	     *
-	     *
-	     * @param {boolean} [deferDefinitionErrorsHandling=false] -
-	     *                  An optional flag indicating that lexer definition errors
-	     *                  should not automatically cause an error to be raised.
-	     *                  This can be useful when wishing to indicate lexer errors in another manner
-	     *                  than simply throwing an error (for example in an online playground).
-	     */
-	    function Lexer(lexerDefinition, deferDefinitionErrorsHandling) {
-	        var _this = this;
-	        if (deferDefinitionErrorsHandling === void 0) { deferDefinitionErrorsHandling = false; }
-	        this.lexerDefinition = lexerDefinition;
-	        this.lexerDefinitionErrors = [];
-	        this.modes = [];
-	        this.allPatterns = {};
-	        this.patternIdxToClass = {};
-	        this.patternIdxToGroup = {};
-	        this.patternIdxToLongerAltIdx = {};
-	        this.patternIdxToCanLineTerminator = {};
-	        this.patternIdxToPushMode = {};
-	        this.patternIdxToPopMode = {};
-	        this.emptyGroups = {};
-	        var actualDefinition;
-	        // Convert SingleModeLexerDefinition into a IMultiModeLexerDefinition.
-	        if (utils_1.isArray(lexerDefinition)) {
-	            actualDefinition = { modes: {} };
-	            actualDefinition.modes[lexer_1.DEFAULT_MODE] = utils_1.cloneArr(lexerDefinition);
-	            actualDefinition[lexer_1.DEFAULT_MODE] = lexer_1.DEFAULT_MODE;
-	        }
-	        else {
-	            actualDefinition = utils_1.cloneObj(lexerDefinition);
-	        }
-	        this.lexerDefinitionErrors = this.lexerDefinitionErrors.concat(lexer_1.performRuntimeChecks(actualDefinition));
-	        // for extra robustness to avoid throwing an none informative error message
-	        actualDefinition.modes = actualDefinition.modes ? actualDefinition.modes : {};
-	        // an error of undefined TokenClasses will be detected in "performRuntimeChecks" above.
-	        // this transformation is to increase robustness in the case of partially invalid lexer definition.
-	        utils_1.forEach(actualDefinition.modes, function (currModeValue, currModeName) {
-	            actualDefinition.modes[currModeName] = utils_1.reject(currModeValue, function (currTokClass) { return utils_1.isUndefined(currTokClass); });
-	        });
-	        var allModeNames = utils_1.keys(actualDefinition.modes);
-	        utils_1.forEach(actualDefinition.modes, function (currModDef, currModName) {
-	            _this.modes.push(currModName);
-	            _this.lexerDefinitionErrors = _this.lexerDefinitionErrors.concat(lexer_1.validatePatterns(currModDef, allModeNames));
-	            // If definition errors were encountered, the analysis phase may fail unexpectedly/
-	            // Considering a lexer with definition errors may never be used, there is no point
-	            // to performing the analysis anyhow...
-	            if (utils_1.isEmpty(_this.lexerDefinitionErrors)) {
-	                var currAnalyzeResult = lexer_1.analyzeTokenClasses(currModDef);
-	                _this.allPatterns[currModName] = currAnalyzeResult.allPatterns;
-	                _this.patternIdxToClass[currModName] = currAnalyzeResult.patternIdxToClass;
-	                _this.patternIdxToGroup[currModName] = currAnalyzeResult.patternIdxToGroup;
-	                _this.patternIdxToLongerAltIdx[currModName] = currAnalyzeResult.patternIdxToLongerAltIdx;
-	                _this.patternIdxToCanLineTerminator[currModName] = currAnalyzeResult.patternIdxToCanLineTerminator;
-	                _this.patternIdxToPushMode[currModName] = currAnalyzeResult.patternIdxToPushMode;
-	                _this.patternIdxToPopMode[currModName] = currAnalyzeResult.patternIdxToPopMode;
-	                _this.emptyGroups = utils_1.merge(_this.emptyGroups, currAnalyzeResult.emptyGroups);
-	            }
-	        });
-	        this.defaultMode = actualDefinition.defaultMode;
-	        // Lazy Mode handling
-	        var allTokensTypes = utils_1.flatten(utils_1.mapValues(actualDefinition.modes, function (currModDef) { return currModDef; }));
-	        var lazyCheckResult = lexer_1.checkLazyMode(allTokensTypes);
-	        this.isLazyTokenMode = lazyCheckResult.isLazy;
-	        this.lexerDefinitionErrors = this.lexerDefinitionErrors.concat(lazyCheckResult.errors);
-	        if (!utils_1.isEmpty(this.lexerDefinitionErrors) && !deferDefinitionErrorsHandling) {
-	            var allErrMessages = utils_1.map(this.lexerDefinitionErrors, function (error) {
-	                return error.message;
-	            });
-	            var allErrMessagesString = allErrMessages.join("-----------------------\n");
-	            throw new Error("Errors detected in definition of Lexer:\n" + allErrMessagesString);
-	        }
-	    }
-	    /**
-	     * Will lex(Tokenize) a string.
-	     * Note that this can be called repeatedly on different strings as this method
-	     * does not modify the state of the Lexer.
-	     *
-	     * @param {string} text - The string to lex
-	     * @param {string} [initialMode] - The initial Lexer Mode to start with, by default this will be the first mode in the lexer's
-	     *                                 definition. If the lexer has no explicit modes it will be the implicit single 'default_mode' mode.
-	     *
-	     * @returns {ILexingResult}
-	     */
-	    Lexer.prototype.tokenize = function (text, initialMode) {
-	        if (initialMode === void 0) { initialMode = this.defaultMode; }
-	        if (!utils_1.isEmpty(this.lexerDefinitionErrors)) {
-	            var allErrMessages = utils_1.map(this.lexerDefinitionErrors, function (error) {
-	                return error.message;
-	            });
-	            var allErrMessagesString = allErrMessages.join("-----------------------\n");
-	            throw new Error("Unable to Tokenize because Errors detected in definition of Lexer:\n" + allErrMessagesString);
-	        }
-	        if (this.isLazyTokenMode) {
-	            return this.tokenizeInternalLazy(text, initialMode);
-	        }
-	        else {
-	            return this.tokenizeInternal(text, initialMode);
-	        }
-	    };
-	    // There is quite a bit of duplication between this and "tokenizeInternalLazy"
-	    // This is intentional due to performance considerations.
-	    Lexer.prototype.tokenizeInternal = function (text, initialMode) {
-	        var _this = this;
-	        var match, i, j, matchAlt, longerAltIdx, matchedImage, imageLength, group, tokClass, newToken, errLength, fixForEndingInLT, c, droppedChar, lastLTIdx, msg, lastCharIsLT;
-	        var orgInput = text;
-	        var offset = 0;
-	        var matchedTokens = [];
-	        var errors = [];
-	        var line = 1;
-	        var column = 1;
-	        var groups = utils_1.cloneObj(this.emptyGroups);
-	        var currModePatterns = [];
-	        var currModePatternsLength = 0;
-	        var currModePatternIdxToLongerAltIdx = [];
-	        var currModePatternIdxToGroup = [];
-	        var currModePatternIdxToClass = [];
-	        var currModePatternIdxToCanLineTerminator = [];
-	        var patternIdxToPushMode = [];
-	        var patternIdxToPopMode = [];
-	        var modeStack = [];
-	        var pop_mode = function (popToken) {
-	            // TODO: perhaps avoid this error in the edge case there is no more input?
-	            if (modeStack.length === 1) {
-	                // if we try to pop the last mode there lexer will no longer have ANY mode.
-	                // thus the pop is ignored, an error will be created and the lexer will continue parsing in the previous mode.
-	                var msg_1 = "Unable to pop Lexer Mode after encountering Token ->" + popToken.image + "<- The Mode Stack is empty";
-	                errors.push({ line: popToken.startLine, column: popToken.startColumn, length: popToken.image.length, message: msg_1 });
-	            }
-	            else {
-	                modeStack.pop();
-	                var newMode = utils_1.last(modeStack);
-	                currModePatterns = _this.allPatterns[newMode];
-	                currModePatternsLength = currModePatterns.length;
-	                currModePatternIdxToLongerAltIdx = _this.patternIdxToLongerAltIdx[newMode];
-	                currModePatternIdxToGroup = _this.patternIdxToGroup[newMode];
-	                currModePatternIdxToClass = _this.patternIdxToClass[newMode];
-	                currModePatternIdxToCanLineTerminator = _this.patternIdxToCanLineTerminator[newMode];
-	                patternIdxToPushMode = _this.patternIdxToPushMode[newMode];
-	                patternIdxToPopMode = _this.patternIdxToPopMode[newMode];
-	            }
-	        };
-	        function push_mode(newMode) {
-	            modeStack.push(newMode);
-	            currModePatterns = this.allPatterns[newMode];
-	            currModePatternsLength = currModePatterns.length;
-	            currModePatternIdxToLongerAltIdx = this.patternIdxToLongerAltIdx[newMode];
-	            currModePatternIdxToGroup = this.patternIdxToGroup[newMode];
-	            currModePatternIdxToClass = this.patternIdxToClass[newMode];
-	            currModePatternIdxToCanLineTerminator = this.patternIdxToCanLineTerminator[newMode];
-	            patternIdxToPushMode = this.patternIdxToPushMode[newMode];
-	            patternIdxToPopMode = this.patternIdxToPopMode[newMode];
-	        }
-	        // this pattern seems to avoid a V8 de-optimization, although that de-optimization does not
-	        // seem to matter performance wise.
-	        push_mode.call(this, initialMode);
-	        while (text.length > 0) {
-	            match = null;
-	            for (i = 0; i < currModePatternsLength; i++) {
-	                match = currModePatterns[i].exec(text);
-	                if (match !== null) {
-	                    // even though this pattern matched we must try a another longer alternative.
-	                    // this can be used to prioritize keywords over identifiers
-	                    longerAltIdx = currModePatternIdxToLongerAltIdx[i];
-	                    if (longerAltIdx) {
-	                        matchAlt = currModePatterns[longerAltIdx].exec(text);
-	                        if (matchAlt && matchAlt[0].length > match[0].length) {
-	                            match = matchAlt;
-	                            i = longerAltIdx;
-	                        }
-	                    }
-	                    break;
-	                }
-	            }
-	            // successful match
-	            if (match !== null) {
-	                matchedImage = match[0];
-	                imageLength = matchedImage.length;
-	                group = currModePatternIdxToGroup[i];
-	                if (group !== undefined) {
-	                    tokClass = currModePatternIdxToClass[i];
-	                    newToken = new tokClass(matchedImage, offset, line, column);
-	                    if (group === "default") {
-	                        matchedTokens.push(newToken);
-	                    }
-	                    else {
-	                        groups[group].push(newToken);
-	                    }
-	                }
-	                text = text.slice(imageLength);
-	                offset = offset + imageLength;
-	                column = column + imageLength; // TODO: with newlines the column may be assigned twice
-	                if (currModePatternIdxToCanLineTerminator[i]) {
-	                    var lineTerminatorsInMatch = lexer_1.countLineTerminators(matchedImage);
-	                    // TODO: identify edge case of one token ending in '\r' and another one starting with '\n'
-	                    if (lineTerminatorsInMatch !== 0) {
-	                        line = line + lineTerminatorsInMatch;
-	                        lastLTIdx = imageLength - 1;
-	                        while (lastLTIdx >= 0) {
-	                            c = matchedImage.charCodeAt(lastLTIdx);
-	                            // scan in reverse to find last lineTerminator in image
-	                            if (c === 13 || c === 10) {
-	                                break;
-	                            }
-	                            lastLTIdx--;
-	                        }
-	                        column = imageLength - lastLTIdx;
-	                        if (group !== undefined) {
-	                            lastCharIsLT = lastLTIdx === imageLength - 1;
-	                            fixForEndingInLT = lastCharIsLT ?
-	                                -1 :
-	                                0;
-	                            if (!(lineTerminatorsInMatch === 1 && lastCharIsLT)) {
-	                                // if a token ends in a LT that last LT only affects the line numbering of following Tokens
-	                                newToken.endLine = line + fixForEndingInLT;
-	                                // the last LT in a token does not affect the endColumn either as the [columnStart ... columnEnd)
-	                                // inclusive to exclusive range.
-	                                newToken.endColumn = column - 1 + -fixForEndingInLT;
-	                            }
-	                        }
-	                    }
-	                }
-	                // mode handling, must pop before pushing if a Token both acts as both
-	                // otherwise it would be a NO-OP
-	                if (patternIdxToPopMode[i]) {
-	                    pop_mode(newToken);
-	                }
-	                if (patternIdxToPushMode[i]) {
-	                    push_mode.call(this, patternIdxToPushMode[i]);
-	                }
-	            }
-	            else {
-	                var errorStartOffset = offset;
-	                var errorLine = line;
-	                var errorColumn = column;
-	                var foundResyncPoint = false;
-	                while (!foundResyncPoint && text.length > 0) {
-	                    // drop chars until we succeed in matching something
-	                    droppedChar = text.charCodeAt(0);
-	                    if (droppedChar === 10 ||
-	                        (droppedChar === 13 &&
-	                            (text.length === 1 || (text.length > 1 && text.charCodeAt(1) !== 10)))) {
-	                        line++;
-	                        column = 1;
-	                    }
-	                    else {
-	                        // either when skipping the next char, or when consuming the following pattern
-	                        // (which will have to start in a '\n' if we manage to consume it)
-	                        column++;
-	                    }
-	                    text = text.substr(1);
-	                    offset++;
-	                    for (j = 0; j < currModePatterns.length; j++) {
-	                        foundResyncPoint = currModePatterns[j].test(text);
-	                        if (foundResyncPoint) {
-	                            break;
-	                        }
-	                    }
-	                }
-	                errLength = offset - errorStartOffset;
-	                // at this point we either re-synced or reached the end of the input text
-	                msg = ("unexpected character: ->" + orgInput.charAt(errorStartOffset) + "<- at offset: " + errorStartOffset + ",") +
-	                    (" skipped " + (offset - errorStartOffset) + " characters.");
-	                errors.push({ line: errorLine, column: errorColumn, length: errLength, message: msg });
-	            }
-	        }
-	        return { tokens: matchedTokens, groups: groups, errors: errors };
-	    };
-	    Lexer.prototype.tokenizeInternalLazy = function (text, initialMode) {
-	        var _this = this;
-	        var match, i, j, matchAlt, longerAltIdx, matchedImage, imageLength, group, tokClass, newToken, errLength, droppedChar, msg;
-	        var orgInput = text;
-	        var offset = 0;
-	        var matchedTokens = [];
-	        var errors = [];
-	        var groups = utils_1.cloneObj(this.emptyGroups);
-	        var currModePatterns = [];
-	        var currModePatternsLength = 0;
-	        var currModePatternIdxToLongerAltIdx = [];
-	        var currModePatternIdxToGroup = [];
-	        var currModePatternIdxToClass = [];
-	        var patternIdxToPushMode = [];
-	        var patternIdxToPopMode = [];
-	        var lazyCacheData = {
-	            orgText: text,
-	            lineToOffset: []
-	        };
-	        var modeStack = [];
-	        var pop_mode = function (popToken) {
-	            // TODO: perhaps avoid this error in the edge case there is no more input?
-	            if (modeStack.length === 1) {
-	                // if we try to pop the last mode there lexer will no longer have ANY mode.
-	                // thus the pop is ignored, an error will be created and the lexer will continue parsing in the previous mode.
-	                var msg_2 = "Unable to pop Lexer Mode after encountering Token ->" + popToken.image + "<- The Mode Stack is empty";
-	                errors.push({ line: popToken.startLine, column: popToken.startColumn, length: popToken.image.length, message: msg_2 });
-	            }
-	            else {
-	                modeStack.pop();
-	                var newMode = utils_1.last(modeStack);
-	                currModePatterns = _this.allPatterns[newMode];
-	                currModePatternsLength = currModePatterns.length;
-	                currModePatternIdxToLongerAltIdx = _this.patternIdxToLongerAltIdx[newMode];
-	                currModePatternIdxToGroup = _this.patternIdxToGroup[newMode];
-	                currModePatternIdxToClass = _this.patternIdxToClass[newMode];
-	                patternIdxToPushMode = _this.patternIdxToPushMode[newMode];
-	                patternIdxToPopMode = _this.patternIdxToPopMode[newMode];
-	            }
-	        };
-	        function push_mode(newMode) {
-	            modeStack.push(newMode);
-	            currModePatterns = this.allPatterns[newMode];
-	            currModePatternsLength = currModePatterns.length;
-	            currModePatternIdxToLongerAltIdx = this.patternIdxToLongerAltIdx[newMode];
-	            currModePatternIdxToGroup = this.patternIdxToGroup[newMode];
-	            currModePatternIdxToClass = this.patternIdxToClass[newMode];
-	            patternIdxToPushMode = this.patternIdxToPushMode[newMode];
-	            patternIdxToPopMode = this.patternIdxToPopMode[newMode];
-	        }
-	        // this pattern seems to avoid a V8 de-optimization, although that de-optimization does not
-	        // seem to matter performance wise.
-	        push_mode.call(this, initialMode);
-	        while (text.length > 0) {
-	            match = null;
-	            for (i = 0; i < currModePatternsLength; i++) {
-	                match = currModePatterns[i].exec(text);
-	                if (match !== null) {
-	                    // even though this pattern matched we must try a another longer alternative.
-	                    // this can be used to prioritize keywords over identifiers
-	                    longerAltIdx = currModePatternIdxToLongerAltIdx[i];
-	                    if (longerAltIdx) {
-	                        matchAlt = currModePatterns[longerAltIdx].exec(text);
-	                        if (matchAlt && matchAlt[0].length > match[0].length) {
-	                            match = matchAlt;
-	                            i = longerAltIdx;
-	                        }
-	                    }
-	                    break;
-	                }
-	            }
-	            // successful match
-	            if (match !== null) {
-	                matchedImage = match[0];
-	                imageLength = matchedImage.length;
-	                group = currModePatternIdxToGroup[i];
-	                if (group !== undefined) {
-	                    tokClass = currModePatternIdxToClass[i];
-	                    // the end offset is non inclusive.
-	                    newToken = new tokClass(offset, offset + imageLength - 1, lazyCacheData);
-	                    if (group === "default") {
-	                        matchedTokens.push(newToken);
-	                    }
-	                    else {
-	                        groups[group].push(newToken);
-	                    }
-	                }
-	                text = text.slice(imageLength);
-	                offset = offset + imageLength;
-	                // mode handling, must pop before pushing if a Token both acts as both
-	                // otherwise it would be a NO-OP
-	                if (patternIdxToPopMode[i]) {
-	                    pop_mode(newToken);
-	                }
-	                if (patternIdxToPushMode[i]) {
-	                    push_mode.call(this, patternIdxToPushMode[i]);
-	                }
-	            }
-	            else {
-	                var errorStartOffset = offset;
-	                var foundResyncPoint = false;
-	                while (!foundResyncPoint && text.length > 0) {
-	                    // drop chars until we succeed in matching something
-	                    droppedChar = text.charCodeAt(0);
-	                    text = text.substr(1);
-	                    offset++;
-	                    for (j = 0; j < currModePatterns.length; j++) {
-	                        foundResyncPoint = currModePatterns[j].test(text);
-	                        if (foundResyncPoint) {
-	                            break;
-	                        }
-	                    }
-	                }
-	                errLength = offset - errorStartOffset;
-	                // at this point we either re-synced or reached the end of the input text
-	                msg = ("unexpected character: ->" + orgInput.charAt(errorStartOffset) + "<- at offset: " + errorStartOffset + ",") +
-	                    (" skipped " + (offset - errorStartOffset) + " characters.");
-	                if (utils_1.isEmpty(lazyCacheData.lineToOffset)) {
-	                    tokens_1.fillUpLineToOffset(lazyCacheData.lineToOffset, lazyCacheData.orgText);
-	                }
-	                var errorLine = tokens_1.getStartLineFromLineToOffset(errorStartOffset, lazyCacheData.lineToOffset);
-	                var errorColumn = tokens_1.getStartColumnFromLineToOffset(errorStartOffset, lazyCacheData.lineToOffset);
-	                errors.push({ line: errorLine, column: errorColumn, length: errLength, message: msg });
-	            }
-	        }
-	        return { tokens: matchedTokens, groups: groups, errors: errors };
-	    };
-	    Lexer.SKIPPED = {
-	        description: "This marks a skipped Token pattern, this means each token identified by it will" +
-	            "be consumed and then throw into oblivion, this can be used to for example: skip whitespace."
-	    };
-	    Lexer.NA = /NOT_APPLICABLE/;
-	    return Lexer;
-	}());
-	exports.Lexer = Lexer;
-
-
-/***/ },
-/* 12 */
-/***/ function(module, exports, __webpack_require__) {
-
-	"use strict";
-	var tokens_public_1 = __webpack_require__(10);
-	var lexer_public_1 = __webpack_require__(11);
-	var utils_1 = __webpack_require__(4);
-	var PATTERN = "PATTERN";
-	exports.DEFAULT_MODE = "defaultMode";
-	exports.MODES = "modes";
-	function analyzeTokenClasses(tokenClasses) {
-	    var onlyRelevantClasses = utils_1.reject(tokenClasses, function (currClass) {
-	        return currClass[PATTERN] === lexer_public_1.Lexer.NA;
-	    });
-	    var allTransformedPatterns = utils_1.map(onlyRelevantClasses, function (currClass) {
-	        return addStartOfInput(currClass[PATTERN]);
-	    });
-	    var allPatternsToClass = utils_1.zipObject(allTransformedPatterns, onlyRelevantClasses);
-	    var patternIdxToClass = utils_1.map(allTransformedPatterns, function (pattern) {
-	        return allPatternsToClass[pattern.toString()];
-	    });
-	    var patternIdxToGroup = utils_1.map(onlyRelevantClasses, function (clazz) {
-	        var groupName = clazz.GROUP;
-	        if (groupName === lexer_public_1.Lexer.SKIPPED) {
-	            return undefined;
-	        }
-	        else if (utils_1.isString(groupName)) {
-	            return groupName;
-	        }/* istanbul ignore else */ 
-	        else if (utils_1.isUndefined(groupName)) {
-	            return "default";
-	        }
-	        else {
-	            /* istanbul ignore next */ throw Error("non exhaustive match");
-	        }
-	    });
-	    var patternIdxToLongerAltIdx = utils_1.map(onlyRelevantClasses, function (clazz) {
-	        var longerAltClass = clazz.LONGER_ALT;
-	        if (longerAltClass) {
-	            var longerAltIdx = utils_1.indexOf(onlyRelevantClasses, longerAltClass);
-	            return longerAltIdx;
-	        }
-	    });
-	    var patternIdxToPushMode = utils_1.map(onlyRelevantClasses, function (clazz) { return clazz.PUSH_MODE; });
-	    var patternIdxToPopMode = utils_1.map(onlyRelevantClasses, function (clazz) { return utils_1.has(clazz, "POP_MODE"); });
-	    var patternIdxToCanLineTerminator = utils_1.map(allTransformedPatterns, function (pattern) {
-	        // TODO: unicode escapes of line terminators too?
-	        return /\\n|\\r|\\s/g.test(pattern.source);
-	    });
-	    var emptyGroups = utils_1.reduce(onlyRelevantClasses, function (acc, clazz) {
-	        var groupName = clazz.GROUP;
-	        if (utils_1.isString(groupName)) {
-	            acc[groupName] = [];
-	        }
-	        return acc;
-	    }, {});
-	    return {
-	        allPatterns: allTransformedPatterns,
-	        patternIdxToClass: patternIdxToClass,
-	        patternIdxToGroup: patternIdxToGroup,
-	        patternIdxToLongerAltIdx: patternIdxToLongerAltIdx,
-	        patternIdxToCanLineTerminator: patternIdxToCanLineTerminator,
-	        patternIdxToPushMode: patternIdxToPushMode,
-	        patternIdxToPopMode: patternIdxToPopMode,
-	        emptyGroups: emptyGroups
-	    };
-	}
-	exports.analyzeTokenClasses = analyzeTokenClasses;
-	function validatePatterns(tokenClasses, validModesNames) {
-	    var errors = [];
-	    var missingResult = findMissingPatterns(tokenClasses);
-	    var validTokenClasses = missingResult.valid;
-	    errors = errors.concat(missingResult.errors);
-	    var invalidResult = findInvalidPatterns(validTokenClasses);
-	    validTokenClasses = invalidResult.valid;
-	    errors = errors.concat(invalidResult.errors);
-	    errors = errors.concat(findEndOfInputAnchor(validTokenClasses));
-	    errors = errors.concat(findUnsupportedFlags(validTokenClasses));
-	    errors = errors.concat(findDuplicatePatterns(validTokenClasses));
-	    errors = errors.concat(findInvalidGroupType(validTokenClasses));
-	    errors = errors.concat(findModesThatDoNotExist(validTokenClasses, validModesNames));
-	    return errors;
-	}
-	exports.validatePatterns = validatePatterns;
-	function findMissingPatterns(tokenClasses) {
-	    var tokenClassesWithMissingPattern = utils_1.filter(tokenClasses, function (currClass) {
-	        return !utils_1.has(currClass, PATTERN);
-	    });
-	    var errors = utils_1.map(tokenClassesWithMissingPattern, function (currClass) {
-	        return {
-	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- missing static 'PATTERN' property",
-	            type: lexer_public_1.LexerDefinitionErrorType.MISSING_PATTERN,
-	            tokenClasses: [currClass]
-	        };
-	    });
-	    var valid = utils_1.difference(tokenClasses, tokenClassesWithMissingPattern);
-	    return { errors: errors, valid: valid };
-	}
-	exports.findMissingPatterns = findMissingPatterns;
-	function findInvalidPatterns(tokenClasses) {
-	    var tokenClassesWithInvalidPattern = utils_1.filter(tokenClasses, function (currClass) {
-	        var pattern = currClass[PATTERN];
-	        return !utils_1.isRegExp(pattern);
-	    });
-	    var errors = utils_1.map(tokenClassesWithInvalidPattern, function (currClass) {
-	        return {
-	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'PATTERN' can only be a RegExp",
-	            type: lexer_public_1.LexerDefinitionErrorType.INVALID_PATTERN,
-	            tokenClasses: [currClass]
-	        };
-	    });
-	    var valid = utils_1.difference(tokenClasses, tokenClassesWithInvalidPattern);
-	    return { errors: errors, valid: valid };
-	}
-	exports.findInvalidPatterns = findInvalidPatterns;
-	var end_of_input = /[^\\][\$]/;
-	function findEndOfInputAnchor(tokenClasses) {
-	    var invalidRegex = utils_1.filter(tokenClasses, function (currClass) {
-	        var pattern = currClass[PATTERN];
-	        return end_of_input.test(pattern.source);
-	    });
-	    var errors = utils_1.map(invalidRegex, function (currClass) {
-	        return {
-	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'PATTERN' cannot contain end of input anchor '$'",
-	            type: lexer_public_1.LexerDefinitionErrorType.EOI_ANCHOR_FOUND,
-	            tokenClasses: [currClass]
-	        };
-	    });
-	    return errors;
-	}
-	exports.findEndOfInputAnchor = findEndOfInputAnchor;
-	function findUnsupportedFlags(tokenClasses) {
-	    var invalidFlags = utils_1.filter(tokenClasses, function (currClass) {
-	        var pattern = currClass[PATTERN];
-	        return pattern instanceof RegExp && (pattern.multiline || pattern.global);
-	    });
-	    var errors = utils_1.map(invalidFlags, function (currClass) {
-	        return {
-	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) +
-	                "<- static 'PATTERN' may NOT contain global('g') or multiline('m')",
-	            type: lexer_public_1.LexerDefinitionErrorType.UNSUPPORTED_FLAGS_FOUND,
-	            tokenClasses: [currClass]
-	        };
-	    });
-	    return errors;
-	}
-	exports.findUnsupportedFlags = findUnsupportedFlags;
-	// This can only test for identical duplicate RegExps, not semantically equivalent ones.
-	function findDuplicatePatterns(tokenClasses) {
-	    var found = [];
-	    var identicalPatterns = utils_1.map(tokenClasses, function (outerClass) {
-	        return utils_1.reduce(tokenClasses, function (result, innerClass) {
-	            if ((outerClass.PATTERN.source === innerClass.PATTERN.source) && !utils_1.contains(found, innerClass) &&
-	                innerClass.PATTERN !== lexer_public_1.Lexer.NA) {
-	                // this avoids duplicates in the result, each class may only appear in one "set"
-	                // in essence we are creating Equivalence classes on equality relation.
-	                found.push(innerClass);
-	                result.push(innerClass);
-	                return result;
-	            }
-	            return result;
-	        }, []);
-	    });
-	    identicalPatterns = utils_1.compact(identicalPatterns);
-	    var duplicatePatterns = utils_1.filter(identicalPatterns, function (currIdenticalSet) {
-	        return currIdenticalSet.length > 1;
-	    });
-	    var errors = utils_1.map(duplicatePatterns, function (setOfIdentical) {
-	        var classNames = utils_1.map(setOfIdentical, function (currClass) {
-	            return tokens_public_1.tokenName(currClass);
-	        });
-	        var dupPatternSrc = utils_1.first(setOfIdentical).PATTERN;
-	        return {
-	            message: ("The same RegExp pattern ->" + dupPatternSrc + "<-") +
-	                ("has been used in all the following classes: " + classNames.join(", ") + " <-"),
-	            type: lexer_public_1.LexerDefinitionErrorType.DUPLICATE_PATTERNS_FOUND,
-	            tokenClasses: setOfIdentical
-	        };
-	    });
-	    return errors;
-	}
-	exports.findDuplicatePatterns = findDuplicatePatterns;
-	function findInvalidGroupType(tokenClasses) {
-	    var invalidTypes = utils_1.filter(tokenClasses, function (clazz) {
-	        if (!utils_1.has(clazz, "GROUP")) {
-	            return false;
-	        }
-	        var group = clazz.GROUP;
-	        return group !== lexer_public_1.Lexer.SKIPPED &&
-	            group !== lexer_public_1.Lexer.NA && !utils_1.isString(group);
-	    });
-	    var errors = utils_1.map(invalidTypes, function (currClass) {
-	        return {
-	            message: "Token class: ->" + tokens_public_1.tokenName(currClass) + "<- static 'GROUP' can only be Lexer.SKIPPED/Lexer.NA/A String",
-	            type: lexer_public_1.LexerDefinitionErrorType.INVALID_GROUP_TYPE_FOUND,
-	            tokenClasses: [currClass]
-	        };
-	    });
-	    return errors;
-	}
-	exports.findInvalidGroupType = findInvalidGroupType;
-	function findModesThatDoNotExist(tokenClasses, validModes) {
-	    var invalidModes = utils_1.filter(tokenClasses, function (clazz) {
-	        return clazz.PUSH_MODE !== undefined && !utils_1.contains(validModes, clazz.PUSH_MODE);
-	    });
-	    var errors = utils_1.map(invalidModes, function (clazz) {
-	        var msg = ("Token class: ->" + tokens_public_1.tokenName(clazz) + "<- static 'PUSH_MODE' value cannot refer to a Lexer Mode ->" + clazz.PUSH_MODE + "<-") +
-	            "which does not exist";
-	        return {
-	            message: msg,
-	            type: lexer_public_1.LexerDefinitionErrorType.PUSH_MODE_DOES_NOT_EXIST,
-	            tokenClasses: [clazz]
-	        };
-	    });
-	    return errors;
-	}
-	exports.findModesThatDoNotExist = findModesThatDoNotExist;
-	function addStartOfInput(pattern) {
-	    var flags = pattern.ignoreCase ?
-	        "i" :
-	        "";
-	    // always wrapping in a none capturing group preceded by '^' to make sure matching can only work on start of input.
-	    // duplicate/redundant start of input markers have no meaning (/^^^^A/ === /^A/)
-	    return new RegExp("^(?:" + pattern.source + ")", flags);
-	}
-	exports.addStartOfInput = addStartOfInput;
-	function countLineTerminators(text) {
-	    var lineTerminators = 0;
-	    var currOffset = 0;
-	    while (currOffset < text.length) {
-	        var c = text.charCodeAt(currOffset);
-	        if (c === 10) {
-	            lineTerminators++;
-	        }
-	        else if (c === 13) {
-	            if (currOffset !== text.length - 1 &&
-	                text.charCodeAt(currOffset + 1) === 10) {
-	            }
-	            else {
-	                lineTerminators++;
-	            }
-	        }
-	        currOffset++;
-	    }
-	    return lineTerminators;
-	}
-	exports.countLineTerminators = countLineTerminators;
-	function performRuntimeChecks(lexerDefinition) {
-	    var errors = [];
-	    // some run time checks to help the end users.
-	    if (!utils_1.has(lexerDefinition, exports.DEFAULT_MODE)) {
-	        errors.push({
-	            message: "A MultiMode Lexer cannot be initialized without a <" + exports.DEFAULT_MODE + "> property in its definition\n",
-	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_WITHOUT_DEFAULT_MODE
-	        });
-	    }
-	    if (!utils_1.has(lexerDefinition, exports.MODES)) {
-	        errors.push({
-	            message: "A MultiMode Lexer cannot be initialized without a <" + exports.MODES + "> property in its definition\n",
-	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_WITHOUT_MODES_PROPERTY
-	        });
-	    }
-	    if (utils_1.has(lexerDefinition, exports.MODES) &&
-	        utils_1.has(lexerDefinition, exports.DEFAULT_MODE) && !utils_1.has(lexerDefinition.modes, lexerDefinition.defaultMode)) {
-	        errors.push({
-	            message: ("A MultiMode Lexer cannot be initialized with a " + exports.DEFAULT_MODE + ": <" + lexerDefinition.defaultMode + ">")
-	                + "which does not exist\n",
-	            type: lexer_public_1.LexerDefinitionErrorType.MULTI_MODE_LEXER_DEFAULT_MODE_VALUE_DOES_NOT_EXIST
-	        });
-	    }
-	    if (utils_1.has(lexerDefinition, exports.MODES)) {
-	        utils_1.forEach(lexerDefinition.modes, function (currModeValue, currModeName) {
-	            utils_1.forEach(currModeValue, function (currTokClass, currIdx) {
-	                if (utils_1.isUndefined(currTokClass)) {
-	                    errors.push({
-	                        message: "A Lexer cannot be initialized using an undefined Token Class. Mode:" +
-	                            ("<" + currModeName + "> at index: <" + currIdx + ">\n"),
-	                        type: lexer_public_1.LexerDefinitionErrorType.LEXER_DEFINITION_CANNOT_CONTAIN_UNDEFINED
-	                    });
-	                }
-	            });
-	            // lexerDefinition.modes[currModeName] = reject<Function>(currModeValue, (currTokClass) => isUndefined(currTokClass))
-	        });
-	    }
-	    return errors;
-	}
-	exports.performRuntimeChecks = performRuntimeChecks;
-	function isLazyToken(tokType) {
-	    return tokens_public_1.LazyToken.prototype.isPrototypeOf(tokType.prototype);
-	}
-	function checkLazyMode(allTokenTypes) {
-	    var errors = [];
-	    var allTokensTypeSet = utils_1.uniq(allTokenTypes, function (currTokType) { return tokens_public_1.tokenName(currTokType); });
-	    var areAllLazy = utils_1.every(allTokensTypeSet, function (currTokType) { return isLazyToken(currTokType); });
-	    var areAllNotLazy = utils_1.every(allTokensTypeSet, function (currTokType) { return !isLazyToken(currTokType); });
-	    if (!areAllLazy && !areAllNotLazy) {
-	        var lazyTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return isLazyToken(currTokType); });
-	        var lazyTokensNames = utils_1.map(lazyTokens, tokens_public_1.tokenName);
-	        var lazyTokensString = lazyTokensNames.join("\n\t");
-	        var notLazyTokens = utils_1.filter(allTokensTypeSet, function (currTokType) { return !isLazyToken(currTokType); });
-	        var notLazyTokensNames = utils_1.map(notLazyTokens, tokens_public_1.tokenName);
-	        var notLazyTokensString = notLazyTokensNames.join("\n\t");
-	        errors.push({
-	            message: "A Lexer cannot be defined using a mix of both Lazy and Non-Lazy Tokens:\n" +
-	                "Lazy Tokens:\n\t" +
-	                lazyTokensString +
-	                "\nNon-Lazy Tokens:\n\t" +
-	                notLazyTokensString,
-	            type: lexer_public_1.LexerDefinitionErrorType.LEXER_DEFINITION_CANNOT_MIX_LAZY_AND_NOT_LAZY
-	        });
-	    }
-	    return {
-	        isLazy: areAllLazy,
-	        errors: errors
-	    };
-	}
-	exports.checkLazyMode = checkLazyMode;
-
-
-/***/ },
-/* 13 */
-/***/ function(module, exports) {
-
-	"use strict";
-	function fillUpLineToOffset(lineToOffset, text) {
-	    var currLine = 0;
-	    var currOffset = 0;
-	    // line 1 (idx 0 in the array) always starts at offset 0
-	    lineToOffset.push(0);
-	    while (currOffset < text.length) {
-	        var c = text.charCodeAt(currOffset);
-	        if (c === 10) {
-	            currLine++;
-	            // +1 because the next line starts only AFTER the "\n"
-	            lineToOffset.push(currOffset + 1);
-	        }
-	        else if (c === 13) {
-	            if (currOffset !== text.length - 1 &&
-	                text.charCodeAt(currOffset + 1) === 10) {
-	                // +2 because the next line starts only AFTER the "\r\n"
-	                lineToOffset.push(currOffset + 2);
-	                // "consume" two chars
-	                currOffset++;
-	            }
-	            else {
-	                currLine++;
-	                // +1 because the next line starts only AFTER the "\r"
-	                lineToOffset.push(currOffset + 1);
-	            }
-	        }
-	        currOffset++;
-	    }
-	    // to make the data structure consistent
-	    lineToOffset.push(Infinity);
-	}
-	exports.fillUpLineToOffset = fillUpLineToOffset;
-	function getStartLineFromLineToOffset(startOffset, lineToOffset) {
-	    return findLineOfOffset(startOffset, lineToOffset);
-	}
-	exports.getStartLineFromLineToOffset = getStartLineFromLineToOffset;
-	function getEndLineFromLineToOffset(endOffset, lineToOffset) {
-	    return findLineOfOffset(endOffset, lineToOffset);
-	}
-	exports.getEndLineFromLineToOffset = getEndLineFromLineToOffset;
-	function getStartColumnFromLineToOffset(startOffset, lineToOffset) {
-	    return findColumnOfOffset(startOffset, lineToOffset);
-	}
-	exports.getStartColumnFromLineToOffset = getStartColumnFromLineToOffset;
-	function getEndColumnFromLineToOffset(endOffset, lineToOffset) {
-	    // none inclusive
-	    return findColumnOfOffset(endOffset, lineToOffset);
-	}
-	exports.getEndColumnFromLineToOffset = getEndColumnFromLineToOffset;
-	/**
-	 *  Modification of a binary search to seek
-	 */
-	function findLineOfOffset(targetOffset, lineToOffset) {
-	    var lowIdx = 0;
-	    var highIdx = lineToOffset.length - 1;
-	    var found = false;
-	    var line = -1;
-	    while (!found) {
-	        var middleIdx = Math.floor((highIdx + lowIdx) / 2);
-	        var middleOffset = lineToOffset[middleIdx];
-	        var middleNextOffset = lineToOffset[middleIdx + 1];
-	        if (middleOffset <= targetOffset &&
-	            middleNextOffset > targetOffset) {
-	            found = true;
-	            line = middleIdx;
-	        }
-	        else if (middleOffset > targetOffset) {
-	            highIdx = middleIdx;
-	        }
-	        else if (middleNextOffset < targetOffset) {
-	            lowIdx = middleIdx;
-	        }/* istanbul ignore else */ 
-	        else if (middleNextOffset === targetOffset) {
-	            found = true;
-	            line = middleIdx + 1;
-	        }
-	        else {
-	            /* istanbul ignore next */ throw Error("non exhaustive match");
-	        }
-	    }
-	    // +1 because lines are counted from 1 while array indices are zero based.
-	    return line + 1;
-	}
-	function findColumnOfOffset(offset, lineToOffset) {
-	    var line = findLineOfOffset(offset, lineToOffset);
-	    // +1 because columns always start at 1
-	    return offset - lineToOffset[line - 1] + 1;
-	}
-
-
-/***/ },
 /* 14 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 	var gast_public_1 = __webpack_require__(7);
-	var gast_1 = __webpack_require__(9);
+	var gast_1 = __webpack_require__(13);
 	var utils_1 = __webpack_require__(4);
 	function first(prod) {
 	    if (prod instanceof gast_public_1.gast.NonTerminal) {
@@ -4282,9 +4809,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    PROD_TYPE[PROD_TYPE["ALTERNATION"] = 5] = "ALTERNATION";
 	})(exports.PROD_TYPE || (exports.PROD_TYPE = {}));
 	var PROD_TYPE = exports.PROD_TYPE;
-	function buildLookaheadFuncForOr(occurrence, ruleGrammar, k, hasPredicates) {
+	function buildLookaheadFuncForOr(occurrence, ruleGrammar, k, hasPredicates, tokenMatcher, tokenClassIdentityFunc, tokenIdentityFunc, dynamicTokensEnabled) {
 	    var lookAheadPaths = getLookaheadPathsForOr(occurrence, ruleGrammar, k);
-	    return buildAlternativesLookAheadFunc(lookAheadPaths, hasPredicates);
+	    return buildAlternativesLookAheadFunc(lookAheadPaths, hasPredicates, tokenMatcher, tokenClassIdentityFunc, tokenIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadFuncForOr = buildLookaheadFuncForOr;
 	/**
@@ -4299,37 +4826,32 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 *  @returns A Lookahead function which will return true IFF the parser should parse the Optional production.
 	 */
-	function buildLookaheadFuncForOptionalProd(occurrence, ruleGrammar, prodType, k) {
+	function buildLookaheadFuncForOptionalProd(occurrence, ruleGrammar, prodType, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
 	    var lookAheadPaths = getLookaheadPathsForOptionalProd(occurrence, ruleGrammar, prodType, k);
-	    return buildSingleAlternativeLookaheadFunction(lookAheadPaths[0]);
+	    return buildSingleAlternativeLookaheadFunction(lookAheadPaths[0], tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadFuncForOptionalProd = buildLookaheadFuncForOptionalProd;
-	function buildLookaheadForOption(optionOccurrence, ruleGrammar, k) {
-	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.OPTION, k);
+	function buildLookaheadForOption(optionOccurrence, ruleGrammar, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
+	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.OPTION, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadForOption = buildLookaheadForOption;
-	function buildLookaheadForMany(optionOccurrence, ruleGrammar, k) {
-	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION, k);
+	function buildLookaheadForMany(optionOccurrence, ruleGrammar, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
+	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadForMany = buildLookaheadForMany;
-	function buildLookaheadForManySep(optionOccurrence, ruleGrammar, k) {
-	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_WITH_SEPARATOR, k);
+	function buildLookaheadForManySep(optionOccurrence, ruleGrammar, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
+	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_WITH_SEPARATOR, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadForManySep = buildLookaheadForManySep;
-	function buildLookaheadForAtLeastOne(optionOccurrence, ruleGrammar, k) {
-	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_MANDATORY, k);
+	function buildLookaheadForAtLeastOne(optionOccurrence, ruleGrammar, k, tokenMatcher, tokenIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
+	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_MANDATORY, k, tokenMatcher, tokenIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadForAtLeastOne = buildLookaheadForAtLeastOne;
-	function buildLookaheadForAtLeastOneSep(optionOccurrence, ruleGrammar, k) {
-	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_MANDATORY_WITH_SEPARATOR, k);
+	function buildLookaheadForAtLeastOneSep(optionOccurrence, ruleGrammar, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
+	    return buildLookaheadFuncForOptionalProd(optionOccurrence, ruleGrammar, PROD_TYPE.REPETITION_MANDATORY_WITH_SEPARATOR, k, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled);
 	}
 	exports.buildLookaheadForAtLeastOneSep = buildLookaheadForAtLeastOneSep;
-	/**
-	 * @param alts
-	 * @param hasPredicates
-	 * @returns {function(): number}
-	 */
-	function buildAlternativesLookAheadFunc(alts, hasPredicates) {
+	function buildAlternativesLookAheadFunc(alts, hasPredicates, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
 	    var numOfAlts = alts.length;
 	    var areAllOneTokenLookahead = utils_1.every(alts, function (currAlt) {
 	        return utils_1.every(currAlt, function (currPath) {
@@ -4359,7 +4881,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    var currPathLength = currPath.length;
 	                    for (var i = 0; i < currPathLength; i++) {
 	                        var nextToken = this.LA(i + 1);
-	                        if (!(nextToken instanceof currPath[i])) {
+	                        if (!tokenMatcher(nextToken, currPath[i])) {
 	                            // mismatch in current path
 	                            // try the next pth
 	                            continue nextPath;
@@ -4371,34 +4893,32 @@ return /******/ (function(modules) { // webpackBootstrap
 	                }
 	            }
 	            // none of the alternatives could be matched
-	            return -1;
+	            return undefined;
 	        };
 	    }
-	    else if (areAllOneTokenLookahead) {
-	        var singleTokenAlts_1 = utils_1.map(alts, function (currAlt) {
+	    else if (areAllOneTokenLookahead && !dynamicTokensEnabled) {
+	        var singleTokenAlts = utils_1.map(alts, function (currAlt) {
 	            return utils_1.flatten(currAlt);
 	        });
+	        var choiceToAlt_1 = utils_1.reduce(singleTokenAlts, function (result, currAlt, idx) {
+	            utils_1.forEach(currAlt, function (currTokClass) {
+	                if (!utils_1.has(result, tokenClassIdentityFunc(currTokClass))) {
+	                    result[tokenClassIdentityFunc(currTokClass)] = idx;
+	                }
+	                utils_1.forEach(currTokClass.extendingTokenTypes, function (currExtendingType) {
+	                    if (!utils_1.has(result, currExtendingType)) {
+	                        result[currExtendingType] = idx;
+	                    }
+	                });
+	            });
+	            return result;
+	        }, {});
 	        /**
 	         * @returns {number} - The chosen alternative index
 	         */
 	        return function () {
 	            var nextToken = this.LA(1);
-	            for (var t = 0; t < numOfAlts; t++) {
-	                var currSingleTokens = singleTokenAlts_1[t];
-	                var numberOfPossibleTokens = currSingleTokens.length;
-	                for (var j = 0; j < numberOfPossibleTokens; j++) {
-	                    var currExpectedToken = currSingleTokens[j];
-	                    if (!(nextToken instanceof currExpectedToken)) {
-	                        // try the next possible token
-	                        continue;
-	                    }
-	                    // found a full path that matches.
-	                    // this will also work for an empty ALT as the loop will be skipped
-	                    return t;
-	                }
-	            }
-	            // none of the alternatives could be matched
-	            return -1;
+	            return choiceToAlt_1[tokenInstanceIdentityFunc(nextToken)];
 	        };
 	    }
 	    else {
@@ -4414,7 +4934,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    var currPathLength = currPath.length;
 	                    for (var i = 0; i < currPathLength; i++) {
 	                        var nextToken = this.LA(i + 1);
-	                        if (!(nextToken instanceof currPath[i])) {
+	                        if (!(tokenMatcher(nextToken, currPath[i]))) {
 	                            // mismatch in current path
 	                            // try the next pth
 	                            continue nextPath;
@@ -4426,35 +4946,40 @@ return /******/ (function(modules) { // webpackBootstrap
 	                }
 	            }
 	            // none of the alternatives could be matched
-	            return -1;
+	            return undefined;
 	        };
 	    }
 	}
 	exports.buildAlternativesLookAheadFunc = buildAlternativesLookAheadFunc;
-	function buildSingleAlternativeLookaheadFunction(alt) {
+	function buildSingleAlternativeLookaheadFunction(alt, tokenMatcher, tokenClassIdentityFunc, tokenInstanceIdentityFunc, dynamicTokensEnabled) {
 	    var areAllOneTokenLookahead = utils_1.every(alt, function (currPath) {
 	        return currPath.length === 1;
 	    });
 	    var numOfPaths = alt.length;
 	    // optimized (common) case of all the lookaheads paths requiring only
 	    // a single token lookahead.
-	    if (areAllOneTokenLookahead) {
-	        var singleTokens_1 = utils_1.flatten(alt);
-	        return function () {
-	            var nextToken = this.LA(1);
-	            for (var j = 0; j < singleTokens_1.length; j++) {
-	                var currPossibleTok = singleTokens_1[j];
-	                if (!(nextToken instanceof currPossibleTok)) {
-	                    // mismatch in current path
-	                    // try the next pth
-	                    continue;
-	                }
-	                // found a full path that matches.
-	                return true;
-	            }
-	            // none of the paths matched
-	            return false;
-	        };
+	    if (areAllOneTokenLookahead && !dynamicTokensEnabled) {
+	        var singleTokensClasses = utils_1.flatten(alt);
+	        if (singleTokensClasses.length === 1 && utils_1.isEmpty(singleTokensClasses[0].extendingTokenTypes)) {
+	            var expectedTokenType = singleTokensClasses[0];
+	            var expectedTokenUniqueKey_1 = tokenClassIdentityFunc(expectedTokenType);
+	            return function () {
+	                return tokenInstanceIdentityFunc(this.LA(1)) === expectedTokenUniqueKey_1;
+	            };
+	        }
+	        else {
+	            var choiceToAlt_2 = utils_1.reduce(singleTokensClasses, function (result, currTokClass, idx) {
+	                result[tokenClassIdentityFunc(currTokClass)] = true;
+	                utils_1.forEach(currTokClass.extendingTokenTypes, function (currExtendingType) {
+	                    result[currExtendingType] = true;
+	                });
+	                return result;
+	            }, {});
+	            return function () {
+	                var nextToken = this.LA(1);
+	                return choiceToAlt_2[tokenInstanceIdentityFunc(nextToken)] === true ? true : false;
+	            };
+	        }
 	    }
 	    else {
 	        return function () {
@@ -4463,7 +4988,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                var currPathLength = currPath.length;
 	                for (var i = 0; i < currPathLength; i++) {
 	                    var nextToken = this.LA(i + 1);
-	                    if (!(nextToken instanceof currPath[i])) {
+	                    if (!(tokenMatcher(nextToken, currPath[i]))) {
 	                        // mismatch in current path
 	                        // try the next pth
 	                        continue nextPath;
@@ -4666,7 +5191,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var rest_1 = __webpack_require__(17);
 	var gast_public_1 = __webpack_require__(7);
 	var utils_1 = __webpack_require__(4);
-	var tokens_public_1 = __webpack_require__(10);
+	var tokens_public_1 = __webpack_require__(8);
 	var first_1 = __webpack_require__(14);
 	/* tslint:enable:no-use-before-declare */
 	var AbstractNextPossibleTokensWalker = (function (_super) {
@@ -4919,6 +5444,219 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return result;
 	}
 	exports.possiblePathsFrom = possiblePathsFrom;
+	function nextPossibleTokensAfter(initialDef, tokenVector, tokMatcher, maxLookAhead) {
+	    var EXIT_NON_TERMINAL = "EXIT_NONE_TERMINAL";
+	    // to avoid creating a new Array each time.
+	    var EXIT_NON_TERMINAL_ARR = [EXIT_NON_TERMINAL];
+	    var EXIT_ALTERNATIVE = "EXIT_ALTERNATIVE";
+	    var foundCompletePath = false;
+	    var tokenVectorLength = tokenVector.length;
+	    var minimalAlternativesIndex = tokenVectorLength - maxLookAhead - 1;
+	    var result = [];
+	    var possiblePaths = [];
+	    possiblePaths.push({ idx: -1, def: initialDef, ruleStack: [], occurrenceStack: [] });
+	    while (!utils_1.isEmpty(possiblePaths)) {
+	        var currPath = possiblePaths.pop();
+	        // skip alternatives if no more results can be found (assuming deterministic grammar with fixed lookahead)
+	        if (currPath === EXIT_ALTERNATIVE) {
+	            if (foundCompletePath &&
+	                utils_1.last(possiblePaths).idx <= minimalAlternativesIndex) {
+	                // remove irrelevant alternative
+	                possiblePaths.pop();
+	            }
+	            continue;
+	        }
+	        var currDef = currPath.def;
+	        var currIdx = currPath.idx;
+	        var currRuleStack = currPath.ruleStack;
+	        var currOccurrenceStack = currPath.occurrenceStack;
+	        // For Example: an empty path could exist in a valid grammar in the case of an EMPTY_ALT
+	        if (utils_1.isEmpty(currDef)) {
+	            continue;
+	        }
+	        var prod = currDef[0];
+	        if (prod === EXIT_NON_TERMINAL) {
+	            var nextPath = {
+	                idx: currIdx,
+	                def: utils_1.drop(currDef),
+	                ruleStack: utils_1.dropRight(currRuleStack),
+	                occurrenceStack: utils_1.dropRight(currOccurrenceStack)
+	            };
+	            possiblePaths.push(nextPath);
+	        }
+	        else if (prod instanceof gast_public_1.gast.Terminal) {
+	            if (currIdx < tokenVectorLength - 1) {
+	                var nextIdx = currIdx + 1;
+	                var actualToken = tokenVector[nextIdx];
+	                if (tokMatcher(actualToken, prod.terminalType)) {
+	                    var nextPath = {
+	                        idx: nextIdx,
+	                        def: utils_1.drop(currDef),
+	                        ruleStack: currRuleStack,
+	                        occurrenceStack: currOccurrenceStack
+	                    };
+	                    possiblePaths.push(nextPath);
+	                }
+	            }/* istanbul ignore else */ 
+	            else if (currIdx === tokenVectorLength - 1) {
+	                
+	                result.push({
+	                    nextTokenType: prod.terminalType,
+	                    nextTokenOccurrence: prod.occurrenceInParent,
+	                    ruleStack: currRuleStack,
+	                    occurrenceStack: currOccurrenceStack
+	                });
+	                foundCompletePath = true;
+	            }
+	            else {
+	                /* istanbul ignore next */ throw Error("non exhaustive match");
+	            }
+	        }
+	        else if (prod instanceof gast_public_1.gast.NonTerminal) {
+	            var newRuleStack = utils_1.cloneArr(currRuleStack);
+	            newRuleStack.push(prod.nonTerminalName);
+	            var newOccurrenceStack = utils_1.cloneArr(currOccurrenceStack);
+	            newOccurrenceStack.push(prod.occurrenceInParent);
+	            var nextPath = {
+	                idx: currIdx,
+	                def: prod.definition.concat(EXIT_NON_TERMINAL_ARR, utils_1.drop(currDef)),
+	                ruleStack: newRuleStack,
+	                occurrenceStack: newOccurrenceStack
+	            };
+	            possiblePaths.push(nextPath);
+	        }
+	        else if (prod instanceof gast_public_1.gast.Option) {
+	            // the order of alternatives is meaningful, FILO (Last path will be traversed first).
+	            var nextPathWithout = {
+	                idx: currIdx,
+	                def: utils_1.drop(currDef),
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWithout);
+	            // required marker to avoid backtracking paths whose higher priority alternatives already matched
+	            possiblePaths.push(EXIT_ALTERNATIVE);
+	            var nextPathWith = {
+	                idx: currIdx,
+	                def: prod.definition.concat(utils_1.drop(currDef)),
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWith);
+	        }
+	        else if (prod instanceof gast_public_1.gast.RepetitionMandatory) {
+	            // TODO:(THE NEW operators here take a while...) (convert once?)
+	            var secondIteration = new gast_public_1.gast.Repetition(prod.definition, prod.occurrenceInParent);
+	            var nextDef = prod.definition.concat([secondIteration], utils_1.drop(currDef));
+	            var nextPath = {
+	                idx: currIdx,
+	                def: nextDef,
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPath);
+	        }
+	        else if (prod instanceof gast_public_1.gast.RepetitionMandatoryWithSeparator) {
+	            // TODO:(THE NEW operators here take a while...) (convert once?)
+	            var separatorGast = new gast_public_1.gast.Terminal(prod.separator);
+	            var secondIteration = new gast_public_1.gast.Repetition([separatorGast].concat(prod.definition), prod.occurrenceInParent);
+	            var nextDef = prod.definition.concat([secondIteration], utils_1.drop(currDef));
+	            var nextPath = {
+	                idx: currIdx,
+	                def: nextDef,
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPath);
+	        }
+	        else if (prod instanceof gast_public_1.gast.RepetitionWithSeparator) {
+	            // the order of alternatives is meaningful, FILO (Last path will be traversed first).
+	            var nextPathWithout = {
+	                idx: currIdx,
+	                def: utils_1.drop(currDef),
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWithout);
+	            // required marker to avoid backtracking paths whose higher priority alternatives already matched
+	            possiblePaths.push(EXIT_ALTERNATIVE);
+	            var separatorGast = new gast_public_1.gast.Terminal(prod.separator);
+	            var nthRepetition = new gast_public_1.gast.Repetition([separatorGast].concat(prod.definition), prod.occurrenceInParent);
+	            var nextDef = prod.definition.concat([nthRepetition], utils_1.drop(currDef));
+	            var nextPathWith = {
+	                idx: currIdx,
+	                def: nextDef,
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWith);
+	        }
+	        else if (prod instanceof gast_public_1.gast.Repetition) {
+	            // the order of alternatives is meaningful, FILO (Last path will be traversed first).
+	            var nextPathWithout = {
+	                idx: currIdx,
+	                def: utils_1.drop(currDef),
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWithout);
+	            // required marker to avoid backtracking paths whose higher priority alternatives already matched
+	            possiblePaths.push(EXIT_ALTERNATIVE);
+	            // TODO: an empty repetition will cause infinite loops here, will the parser detect this in selfAnalysis?
+	            var nthRepetition = new gast_public_1.gast.Repetition(prod.definition, prod.occurrenceInParent);
+	            var nextDef = prod.definition.concat([nthRepetition], utils_1.drop(currDef));
+	            var nextPathWith = {
+	                idx: currIdx, def: nextDef,
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            };
+	            possiblePaths.push(nextPathWith);
+	        }
+	        else if (prod instanceof gast_public_1.gast.Alternation) {
+	            // the order of alternatives is meaningful, FILO (Last path will be traversed first).
+	            for (var i = prod.definition.length - 1; i >= 0; i--) {
+	                var currAlt = prod.definition[i];
+	                var currAltPath = {
+	                    idx: currIdx,
+	                    def: currAlt.definition.concat(utils_1.drop(currDef)),
+	                    ruleStack: currRuleStack,
+	                    occurrenceStack: currOccurrenceStack
+	                };
+	                possiblePaths.push(currAltPath);
+	                possiblePaths.push(EXIT_ALTERNATIVE);
+	            }
+	        }
+	        else if (prod instanceof gast_public_1.gast.Flat) {
+	            possiblePaths.push({
+	                idx: currIdx,
+	                def: prod.definition.concat(utils_1.drop(currDef)),
+	                ruleStack: currRuleStack,
+	                occurrenceStack: currOccurrenceStack
+	            });
+	        }/* istanbul ignore else */ 
+	        else if (prod instanceof gast_public_1.gast.Rule) {
+	            possiblePaths.push(expandTopLevelRule(prod, currIdx, currRuleStack, currOccurrenceStack));
+	        }
+	        else {
+	            /* istanbul ignore next */ throw Error("non exhaustive match");
+	        }
+	    }
+	    return result;
+	}
+	exports.nextPossibleTokensAfter = nextPossibleTokensAfter;
+	function expandTopLevelRule(topRule, currIdx, currRuleStack, currOccurrenceStack) {
+	    var newRuleStack = utils_1.cloneArr(currRuleStack);
+	    newRuleStack.push(topRule.name);
+	    var newCurrOccurrenceStack = utils_1.cloneArr(currOccurrenceStack);
+	    // top rule is always assumed to have been called with occurrence index 1
+	    newCurrOccurrenceStack.push(1);
+	    return {
+	        idx: currIdx,
+	        def: topRule.definition,
+	        ruleStack: newRuleStack,
+	        occurrenceStack: newCurrOccurrenceStack
+	    };
+	}
 
 
 /***/ },
@@ -5042,7 +5780,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var first_1 = __webpack_require__(14);
 	var utils_1 = __webpack_require__(4);
 	var constants_1 = __webpack_require__(19);
-	var tokens_public_1 = __webpack_require__(10);
+	var tokens_public_1 = __webpack_require__(8);
 	// This ResyncFollowsWalker computes all of the follows required for RESYNC
 	// (skipping reference production).
 	var ResyncFollowsWalker = (function (_super) {
