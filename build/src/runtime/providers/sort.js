@@ -12,40 +12,41 @@ var providers = require("./index");
 var Sort = (function (_super) {
     __extends(Sort, _super);
     function Sort(id, args, returns) {
-        _super.call(this, id, args, returns);
+        var _this = _super.call(this, id, args, returns) || this;
         var value = args[0], direction = args[1], per = args[2];
         if (value === undefined) {
-            this.valueVars = [];
+            _this.valueVars = [];
         }
         else if (join_1.isVariable(value)) {
-            this.valueVars = [value];
+            _this.valueVars = [value];
         }
         else {
-            this.valueVars = value;
+            _this.valueVars = value;
         }
         if (direction === undefined) {
-            this.directionVars = [];
+            _this.directionVars = [];
         }
         else if (direction.constructor === Array) {
-            this.directionVars = direction;
+            _this.directionVars = direction;
         }
         else {
-            this.directionVars = [direction];
+            _this.directionVars = [direction];
         }
         if (per === undefined) {
-            this.groupVars = [];
+            _this.groupVars = [];
         }
         else if (join_1.isVariable(per)) {
-            this.groupVars = [per];
+            _this.groupVars = [per];
         }
         else {
-            this.groupVars = per;
+            _this.groupVars = per;
         }
-        this.resolvedGroup = [];
-        this.resolvedValue = [];
-        this.resolvedDirection = [];
-        this.resolvedAggregate = { group: this.resolvedGroup, value: this.resolvedValue, direction: this.resolvedDirection };
-        this.aggregateResults = {};
+        _this.resolvedGroup = [];
+        _this.resolvedValue = [];
+        _this.resolvedDirection = [];
+        _this.resolvedAggregate = { group: _this.resolvedGroup, value: _this.resolvedValue, direction: _this.resolvedDirection };
+        _this.aggregateResults = {};
+        return _this;
     }
     Sort.prototype.resolveAggregate = function (prefix) {
         join_1.resolve(this.valueVars, prefix, this.resolvedValue);
@@ -91,11 +92,11 @@ var Sort = (function (_super) {
         return [];
     };
     Sort.prototype.test = function (prefix) {
-        var group = this.resolveAggregate(prefix).group;
+        var _a = this.resolveAggregate(prefix), group = _a.group, value = _a.value;
         var resultGroup = this.aggregateResults[JSON.stringify(group)];
         if (resultGroup !== undefined) {
             var returns = join_1.resolve(this.returns, prefix, this.resolvedReturns);
-            return returns[0] === resultGroup.result;
+            return returns[0] === resultGroup[JSON.stringify(value)];
         }
     };
     Sort.prototype.getProposal = function (multiIndex, proposed, prefix) {
@@ -155,14 +156,14 @@ var Sort = (function (_super) {
         }
         group.result.push(value.slice());
     };
-    Sort.isAggregate = true;
-    Sort.AttributeMapping = {
-        "value": 0,
-        "direction": 1,
-        "per": 2,
-    };
     return Sort;
 }(join_1.Constraint));
+Sort.isAggregate = true;
+Sort.AttributeMapping = {
+    "value": 0,
+    "direction": 1,
+    "per": 2,
+};
 exports.Sort = Sort;
 providers.provide("sort", Sort);
 //# sourceMappingURL=sort.js.map

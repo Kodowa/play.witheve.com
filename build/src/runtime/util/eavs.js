@@ -2,11 +2,14 @@
 // Utility functions for working with triples
 //---------------------------------------------------------------------
 "use strict";
+var JSON_NULL_ID = "external|json|null";
 //---------------------------------------------------------------------
 // JS conversion
 //---------------------------------------------------------------------
 function fromJS(changes, json, node, scope, idPrefix) {
     if (idPrefix === void 0) { idPrefix = "js"; }
+    if (json === null || json === undefined)
+        return JSON_NULL_ID;
     if (json.constructor === Array) {
         var arrayId = idPrefix + "|array";
         changes.store(scope, arrayId, "tag", "array", node);
@@ -26,10 +29,16 @@ function fromJS(changes, json, node, scope, idPrefix) {
         for (var _a = 0, _b = Object.keys(json); _a < _b.length; _a++) {
             var key = _b[_a];
             var value = json[key];
-            if (value.constructor === Array || typeof value === "object") {
-                value = fromJS(changes, value, node, scope, objectId + "|" + key);
+            if (value === null || value === undefined) {
+                changes.store(scope, JSON_NULL_ID, "tag", "json-null", node);
+                changes.store(scope, objectId, key, JSON_NULL_ID, node);
             }
-            changes.store(scope, objectId, key, value, node);
+            else {
+                if (value.constructor === Array || typeof value === "object") {
+                    value = fromJS(changes, value, node, scope, objectId + "|" + key);
+                }
+                changes.store(scope, objectId, key, value, node);
+            }
         }
         return objectId;
     }
@@ -40,6 +49,8 @@ function fromJS(changes, json, node, scope, idPrefix) {
 exports.fromJS = fromJS;
 function toJS(index, recordId) {
     var result;
+    if (recordId === JSON_NULL_ID)
+        return null;
     var isArray = index.lookup(recordId, "tag", "array");
     if (isArray !== undefined) {
         result = [];

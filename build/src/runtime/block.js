@@ -129,7 +129,7 @@ var DependencyChecker = (function () {
             var attr = deps["any"][a];
             if (attr === true)
                 return true;
-            if (attr === true && attr[v] === true)
+            if (attr && attr[v] === true)
                 return true;
         }
         for (var _i = 0, tags_1 = tags; _i < tags_1.length; _i++) {
@@ -158,10 +158,17 @@ function hasDatabaseScan(strata) {
             var scan = _b[_a];
             if (scan instanceof join_1.Scan)
                 return true;
-            if (scan instanceof join_1.IfScan)
-                return true;
-            if (scan instanceof join_1.NotScan)
-                return true;
+            if (scan instanceof join_1.IfScan) {
+                for (var _c = 0, _d = scan.branches; _c < _d.length; _c++) {
+                    var branch = _d[_c];
+                    if (hasDatabaseScan(branch.strata))
+                        return true;
+                }
+            }
+            if (scan instanceof join_1.NotScan) {
+                if (hasDatabaseScan(scan.strata))
+                    return true;
+            }
         }
     }
     return false;
@@ -291,8 +298,8 @@ var Block = (function () {
         // console.groupEnd();
         return changes;
     };
-    Block.BlockId = 0;
     return Block;
 }());
+Block.BlockId = 0;
 exports.Block = Block;
 //# sourceMappingURL=block.js.map

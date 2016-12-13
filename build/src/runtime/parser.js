@@ -119,415 +119,450 @@ var breakChars = "@#\\.,\\(\\)\\[\\]\\{\\}⦑⦒:\\\"";
 var DocContent = (function (_super) {
     __extends(DocContent, _super);
     function DocContent() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    DocContent.PATTERN = /[^\n]+/;
     return DocContent;
 }(Token));
+DocContent.PATTERN = /[^\n]+/;
 exports.DocContent = DocContent;
 var Fence = (function (_super) {
     __extends(Fence, _super);
     function Fence() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Fence.PATTERN = /```|~~~/;
-    Fence.PUSH_MODE = "code";
     return Fence;
 }(Token));
+Fence.PATTERN = /```|~~~/;
+Fence.PUSH_MODE = "code";
 exports.Fence = Fence;
 var CloseFence = (function (_super) {
     __extends(CloseFence, _super);
     function CloseFence() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    CloseFence.PATTERN = /```|~~~/;
-    CloseFence.POP_MODE = true;
     return CloseFence;
 }(Token));
+CloseFence.PATTERN = /```|~~~/;
+CloseFence.POP_MODE = true;
 exports.CloseFence = CloseFence;
 // Comments
 var CommentLine = (function (_super) {
     __extends(CommentLine, _super);
     function CommentLine() {
-        _super.apply(this, arguments);
-        this.label = "comment";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "comment";
+        return _this;
     }
-    CommentLine.PATTERN = /\/\/.*\n/;
-    CommentLine.GROUP = "comments";
     return CommentLine;
 }(Token));
+CommentLine.PATTERN = /\/\/.*\n/;
+CommentLine.GROUP = "comments";
 exports.CommentLine = CommentLine;
 // Operators
 var Equality = (function (_super) {
     __extends(Equality, _super);
     function Equality() {
-        _super.apply(this, arguments);
-        this.label = "equality";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "equality";
+        return _this;
     }
-    Equality.PATTERN = /:|=/;
     return Equality;
 }(Token));
+Equality.PATTERN = /:|=/;
 exports.Equality = Equality;
 var Comparison = (function (_super) {
     __extends(Comparison, _super);
     function Comparison() {
-        _super.apply(this, arguments);
-        this.label = "comparison";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "comparison";
+        return _this;
     }
-    Comparison.PATTERN = />=|<=|!=|>|</;
     return Comparison;
 }(Token));
+Comparison.PATTERN = />=|<=|!=|>|</;
 exports.Comparison = Comparison;
 var AddInfix = (function (_super) {
     __extends(AddInfix, _super);
     function AddInfix() {
-        _super.apply(this, arguments);
-        this.label = "infix";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "infix";
+        return _this;
     }
-    AddInfix.PATTERN = /\+|-/;
     return AddInfix;
 }(Token));
+AddInfix.PATTERN = /\+|-/;
 exports.AddInfix = AddInfix;
 var MultInfix = (function (_super) {
     __extends(MultInfix, _super);
     function MultInfix() {
-        _super.apply(this, arguments);
-        this.label = "infix";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "infix";
+        return _this;
     }
-    MultInfix.PATTERN = /\*|\//;
     return MultInfix;
 }(Token));
+MultInfix.PATTERN = /\*|\//;
 exports.MultInfix = MultInfix;
 var Merge = (function (_super) {
     __extends(Merge, _super);
     function Merge() {
-        _super.apply(this, arguments);
-        this.label = "merge";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "merge";
+        return _this;
     }
-    Merge.PATTERN = /<-/;
     return Merge;
 }(Token));
+Merge.PATTERN = /<-/;
 exports.Merge = Merge;
 var Set = (function (_super) {
     __extends(Set, _super);
     function Set() {
-        _super.apply(this, arguments);
-        this.label = "set";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "set";
+        return _this;
     }
-    Set.PATTERN = /:=/;
     return Set;
 }(Token));
+Set.PATTERN = /:=/;
 exports.Set = Set;
 var Mutate = (function (_super) {
     __extends(Mutate, _super);
     function Mutate() {
-        _super.apply(this, arguments);
-        this.label = "mutate";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "mutate";
+        return _this;
     }
-    Mutate.PATTERN = /\+=|-=/;
     return Mutate;
 }(Token));
+Mutate.PATTERN = /\+=|-=/;
 exports.Mutate = Mutate;
 var Dot = (function (_super) {
     __extends(Dot, _super);
     function Dot() {
-        _super.apply(this, arguments);
-        this.label = "dot";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "dot";
+        return _this;
     }
-    Dot.PATTERN = /\./;
     return Dot;
 }(Token));
+Dot.PATTERN = /\./;
 exports.Dot = Dot;
 var Pipe = (function (_super) {
     __extends(Pipe, _super);
     function Pipe() {
-        _super.apply(this, arguments);
-        this.label = "pipe";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "pipe";
+        return _this;
     }
-    Pipe.PATTERN = /\|/;
     return Pipe;
 }(Token));
+Pipe.PATTERN = /\|/;
 exports.Pipe = Pipe;
 // Identifier
 var Identifier = (function (_super) {
     __extends(Identifier, _super);
     function Identifier() {
-        _super.apply(this, arguments);
-        this.label = "identifier";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "identifier";
+        return _this;
     }
-    Identifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=[^\\[])");
     return Identifier;
 }(Token));
+Identifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=[^\\[])");
 exports.Identifier = Identifier;
 var FunctionIdentifier = (function (_super) {
     __extends(FunctionIdentifier, _super);
     function FunctionIdentifier() {
-        _super.apply(this, arguments);
-        this.label = "functionIdentifier";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "functionIdentifier";
+        return _this;
     }
-    FunctionIdentifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=\\[)");
     return FunctionIdentifier;
 }(Token));
+FunctionIdentifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=\\[)");
 exports.FunctionIdentifier = FunctionIdentifier;
 // Keywords
 var Keyword = (function (_super) {
     __extends(Keyword, _super);
     function Keyword() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    Keyword.PATTERN = Lexer.NA;
-    Keyword.LONGER_ALT = Identifier;
     return Keyword;
 }(Token));
+Keyword.PATTERN = Lexer.NA;
+Keyword.LONGER_ALT = Identifier;
 exports.Keyword = Keyword;
 var Lookup = (function (_super) {
     __extends(Lookup, _super);
     function Lookup() {
-        _super.apply(this, arguments);
-        this.label = "lookup";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "lookup";
+        return _this;
     }
-    Lookup.PATTERN = /lookup(?=\[)/;
     return Lookup;
 }(Keyword));
+Lookup.PATTERN = /lookup(?=\[)/;
 exports.Lookup = Lookup;
 var Action = (function (_super) {
     __extends(Action, _super);
     function Action() {
-        _super.apply(this, arguments);
-        this.label = "action";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "action";
+        return _this;
     }
-    Action.PATTERN = /bind|commit/;
     return Action;
 }(Keyword));
+Action.PATTERN = /bind|commit/;
 exports.Action = Action;
 var Search = (function (_super) {
     __extends(Search, _super);
     function Search() {
-        _super.apply(this, arguments);
-        this.label = "search";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "search";
+        return _this;
     }
-    Search.PATTERN = /search/;
     return Search;
 }(Keyword));
+Search.PATTERN = /search/;
 exports.Search = Search;
 var Is = (function (_super) {
     __extends(Is, _super);
     function Is() {
-        _super.apply(this, arguments);
-        this.label = "is";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "is";
+        return _this;
     }
-    Is.PATTERN = /is/;
     return Is;
 }(Keyword));
+Is.PATTERN = /is/;
 exports.Is = Is;
 var If = (function (_super) {
     __extends(If, _super);
     function If() {
-        _super.apply(this, arguments);
-        this.label = "if";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "if";
+        return _this;
     }
-    If.PATTERN = /if/;
     return If;
 }(Keyword));
+If.PATTERN = /if/;
 exports.If = If;
 var Else = (function (_super) {
     __extends(Else, _super);
     function Else() {
-        _super.apply(this, arguments);
-        this.label = "else";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "else";
+        return _this;
     }
-    Else.PATTERN = /else/;
     return Else;
 }(Keyword));
+Else.PATTERN = /else/;
 exports.Else = Else;
 var Then = (function (_super) {
     __extends(Then, _super);
     function Then() {
-        _super.apply(this, arguments);
-        this.label = "then";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "then";
+        return _this;
     }
-    Then.PATTERN = /then/;
     return Then;
 }(Keyword));
+Then.PATTERN = /then/;
 exports.Then = Then;
 var Not = (function (_super) {
     __extends(Not, _super);
     function Not() {
-        _super.apply(this, arguments);
-        this.label = "not";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "not";
+        return _this;
     }
-    Not.PATTERN = /not/;
     return Not;
 }(Keyword));
+Not.PATTERN = /not/;
 exports.Not = Not;
 // Values
 var Bool = (function (_super) {
     __extends(Bool, _super);
     function Bool() {
-        _super.apply(this, arguments);
-        this.label = "bool";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "bool";
+        return _this;
     }
-    Bool.PATTERN = /true|false/;
     return Bool;
 }(Keyword));
+Bool.PATTERN = /true|false/;
 exports.Bool = Bool;
 var Num = (function (_super) {
     __extends(Num, _super);
     function Num() {
-        _super.apply(this, arguments);
-        this.label = "num";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "num";
+        return _this;
     }
-    Num.PATTERN = /-?\d+(\.\d+)?/;
     return Num;
 }(Token));
+Num.PATTERN = /-?\d+(\.\d+)?/;
 exports.Num = Num;
 var None = (function (_super) {
     __extends(None, _super);
     function None() {
-        _super.apply(this, arguments);
-        this.label = "none";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "none";
+        return _this;
     }
-    None.PATTERN = /none/;
     return None;
 }(Keyword));
+None.PATTERN = /none/;
 exports.None = None;
 var Name = (function (_super) {
     __extends(Name, _super);
     function Name() {
-        _super.apply(this, arguments);
-        this.label = "name";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "name";
+        return _this;
     }
-    Name.PATTERN = /@/;
     return Name;
 }(Token));
+Name.PATTERN = /@/;
 exports.Name = Name;
 var Tag = (function (_super) {
     __extends(Tag, _super);
     function Tag() {
-        _super.apply(this, arguments);
-        this.label = "tag";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "tag";
+        return _this;
     }
-    Tag.PATTERN = /#/;
     return Tag;
 }(Token));
+Tag.PATTERN = /#/;
 exports.Tag = Tag;
 var Uuid = (function (_super) {
     __extends(Uuid, _super);
     function Uuid() {
-        _super.apply(this, arguments);
-        this.label = "uuid";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "uuid";
+        return _this;
     }
-    Uuid.PATTERN = /⦑.*⦒/;
     return Uuid;
 }(Token));
+Uuid.PATTERN = /⦑.*⦒/;
 exports.Uuid = Uuid;
 // Delimiters
 var OpenBracket = (function (_super) {
     __extends(OpenBracket, _super);
     function OpenBracket() {
-        _super.apply(this, arguments);
-        this.label = "open-bracket";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "open-bracket";
+        return _this;
     }
-    OpenBracket.PATTERN = /\[/;
     return OpenBracket;
 }(Token));
+OpenBracket.PATTERN = /\[/;
 exports.OpenBracket = OpenBracket;
 var CloseBracket = (function (_super) {
     __extends(CloseBracket, _super);
     function CloseBracket() {
-        _super.apply(this, arguments);
-        this.label = "close-bracket";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "close-bracket";
+        return _this;
     }
-    CloseBracket.PATTERN = /\]/;
     return CloseBracket;
 }(Token));
+CloseBracket.PATTERN = /\]/;
 exports.CloseBracket = CloseBracket;
 var OpenParen = (function (_super) {
     __extends(OpenParen, _super);
     function OpenParen() {
-        _super.apply(this, arguments);
-        this.label = "open-paren";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "open-paren";
+        return _this;
     }
-    OpenParen.PATTERN = /\(/;
     return OpenParen;
 }(Token));
+OpenParen.PATTERN = /\(/;
 exports.OpenParen = OpenParen;
 var CloseParen = (function (_super) {
     __extends(CloseParen, _super);
     function CloseParen() {
-        _super.apply(this, arguments);
-        this.label = "close-paren";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "close-paren";
+        return _this;
     }
-    CloseParen.PATTERN = /\)/;
     return CloseParen;
 }(Token));
+CloseParen.PATTERN = /\)/;
 exports.CloseParen = CloseParen;
 // Strings
 var StringChars = (function (_super) {
     __extends(StringChars, _super);
     function StringChars() {
-        _super.apply(this, arguments);
-        this.label = "string";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "string";
+        return _this;
     }
-    StringChars.PATTERN = /(\\.|{(?=[^{])|[^"\\{])+/;
     return StringChars;
 }(Token));
+StringChars.PATTERN = /(\\.|{(?=[^{])|[^"\\{])+/;
 exports.StringChars = StringChars;
 var OpenString = (function (_super) {
     __extends(OpenString, _super);
     function OpenString() {
-        _super.apply(this, arguments);
-        this.label = "quote";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "quote";
+        return _this;
     }
-    OpenString.PATTERN = /"/;
-    OpenString.PUSH_MODE = "string";
     return OpenString;
 }(Token));
+OpenString.PATTERN = /"/;
+OpenString.PUSH_MODE = "string";
 exports.OpenString = OpenString;
 var CloseString = (function (_super) {
     __extends(CloseString, _super);
     function CloseString() {
-        _super.apply(this, arguments);
-        this.label = "quote";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "quote";
+        return _this;
     }
-    CloseString.PATTERN = /"/;
-    CloseString.POP_MODE = true;
     return CloseString;
 }(Token));
+CloseString.PATTERN = /"/;
+CloseString.POP_MODE = true;
 exports.CloseString = CloseString;
 // String Embeds
 var StringEmbedOpen = (function (_super) {
     __extends(StringEmbedOpen, _super);
     function StringEmbedOpen() {
-        _super.apply(this, arguments);
-        this.label = "string-embed-open";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "string-embed-open";
+        return _this;
     }
-    StringEmbedOpen.PATTERN = /{{/;
-    StringEmbedOpen.PUSH_MODE = "code";
     return StringEmbedOpen;
 }(Token));
+StringEmbedOpen.PATTERN = /{{/;
+StringEmbedOpen.PUSH_MODE = "code";
 exports.StringEmbedOpen = StringEmbedOpen;
 var StringEmbedClose = (function (_super) {
     __extends(StringEmbedClose, _super);
     function StringEmbedClose() {
-        _super.apply(this, arguments);
-        this.label = "string-embed-close";
+        var _this = _super.apply(this, arguments) || this;
+        _this.label = "string-embed-close";
+        return _this;
     }
-    StringEmbedClose.PATTERN = /}}/;
-    StringEmbedClose.POP_MODE = true;
     return StringEmbedClose;
 }(Token));
+StringEmbedClose.PATTERN = /}}/;
+StringEmbedClose.POP_MODE = true;
 exports.StringEmbedClose = StringEmbedClose;
 // Whitespace
 var WhiteSpace = (function (_super) {
     __extends(WhiteSpace, _super);
     function WhiteSpace() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    WhiteSpace.PATTERN = /\s+|,/;
-    WhiteSpace.GROUP = Lexer.SKIPPED;
     return WhiteSpace;
 }(Token));
+WhiteSpace.PATTERN = /\s+|,/;
+WhiteSpace.GROUP = Lexer.SKIPPED;
 exports.WhiteSpace = WhiteSpace;
 //-----------------------------------------------------------
 // Lexers
@@ -545,8 +580,8 @@ var LexerModes = {
     "string": [CloseString, StringEmbedOpen, StringChars],
 };
 var allTokens = codeTokens.concat([Fence, DocContent, CloseString, StringEmbedOpen, StringEmbedClose, StringChars]);
-var EveDocLexer = new Lexer({ modes: LexerModes, defaultMode: "doc" }, true);
-var EveBlockLexer = new Lexer({ modes: LexerModes, defaultMode: "code" }, true);
+var EveDocLexer = new Lexer({ modes: LexerModes, defaultMode: "doc" });
+var EveBlockLexer = new Lexer({ modes: LexerModes, defaultMode: "code" });
 var ParseBlock = (function () {
     function ParseBlock(id, variableLookup) {
         this.nodeId = 0;
@@ -622,6 +657,7 @@ var ParseBlock = (function () {
     };
     ParseBlock.prototype.subBlock = function () {
         var neue = new ParseBlock(this.id + "|sub" + this.nodeId++, this.variableLookup);
+        neue.parent = this;
         return neue;
     };
     return ParseBlock;
@@ -633,8 +669,8 @@ exports.ParseBlock = ParseBlock;
 var Parser = (function (_super) {
     __extends(Parser, _super);
     function Parser(input) {
-        _super.call(this, input, allTokens, {});
-        var self = this;
+        var _this = _super.call(this, input, allTokens, {}) || this;
+        var self = _this;
         var rule = function (name, func) {
             self[name] = self.RULE(name, func);
         };
@@ -920,7 +956,18 @@ var Parser = (function (_super) {
                 var attribute = _a[_i];
                 info[attribute.attribute] = attribute.value;
             }
-            var action = makeNode("action", { action: "+=", entity: info.record, attribute: info.attribute, value: info.value, node: info.node, scopes: self.activeScopes, from: [lookup, record] });
+            var actionType = "+=";
+            self.OPTION(function () {
+                self.CONSUME(Set);
+                self.CONSUME(None);
+                if (info["value"] !== undefined) {
+                    actionType = "-=";
+                }
+                else {
+                    actionType = "erase";
+                }
+            });
+            var action = makeNode("action", { action: actionType, entity: info.record, attribute: info.attribute, value: info.value, node: info.node, scopes: self.activeScopes, from: [lookup, record] });
             self.block[actionKey](action);
             return action;
         });
@@ -1088,6 +1135,32 @@ var Parser = (function (_super) {
             self.OR2([
                 { ALT: function () {
                         result = self.SUBRULE(self.infix);
+                        // if the result is a parenthesis, we have to make sure that if there are sub-records
+                        // inside that they get eve-auto-index set on them and they also have the parent transfered
+                        // down to them. If we don't do this, we'll end up with children that are shared between
+                        // the parents instead of one child per parent.
+                        if (result.type === "parenthesis") {
+                            for (var _i = 0, _a = result.items; _i < _a.length; _i++) {
+                                var item = _a[_i];
+                                // this is a bit sad, but by the time we see the parenthesis, the records have been replaced
+                                // with their variables. Those variables are created from the record object though, so we can
+                                // check the from of the variable for a reference to the record.
+                                if (item.type === "variable" && item.from[0] && item.from[0].type === "record") {
+                                    var record = item.from[0];
+                                    // if we have a parent, we need to make sure it ends up part of our extraProjection set
+                                    if (parent && !item.extraProjection) {
+                                        record.extraProjection = [parent];
+                                    }
+                                    else if (parent) {
+                                        record.extraProjection.push(parent);
+                                    }
+                                    // Lastly we need to add the eve-auto-index attribute to make sure this is consistent with the case
+                                    // where we leave the parenthesis off and just put records one after another.
+                                    record.attributes.push(makeNode("attribute", { attribute: "eve-auto-index", value: makeNode("constant", { value: autoIndex, from: [record] }), from: [record] }));
+                                    autoIndex++;
+                                }
+                            }
+                        }
                     } },
                 { ALT: function () {
                         result = self.SUBRULE(self.record, [noVar, blockKey, action, parent]);
@@ -1520,10 +1593,12 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Chevrotain analysis
         //-----------------------------------------------------------
-        Parser.performSelfAnalysis(this);
+        Parser.performSelfAnalysis(_this);
+        return _this;
     }
     return Parser;
 }(chev.Parser));
+exports.Parser = Parser;
 //-----------------------------------------------------------
 // Public API
 //-----------------------------------------------------------
@@ -1610,21 +1685,23 @@ function parseDoc(doc, docId) {
     var allErrors = [];
     for (var _i = 0, blocks_1 = blocks; _i < blocks_1.length; _i++) {
         var block = blocks_1[_i];
-        if (block.info !== "" && block.info.indexOf("eve") === -1)
-            continue;
-        var _b = parseBlock(block.literal, block.id, block.startOffset, spans, extraInfo), results = _b.results, lex = _b.lex, errors = _b.errors;
         extraInfo[block.id] = { info: block.info };
-        // if this block is disabled, we want the parsed spans and such, but we don't want
-        // the block to be in the set sent to the builder
         if (block.info.indexOf("disabled") > -1) {
             extraInfo[block.id].disabled = true;
         }
-        else if (errors.length) {
-            allErrors.push(errors);
-        }
-        else {
-            results.endOffset = block.endOffset;
-            parsedBlocks.push(results);
+        if (block.info !== "" && block.info.indexOf("eve") === -1)
+            continue;
+        var _b = parseBlock(block.literal, block.id, block.startOffset, spans, extraInfo), results = _b.results, lex = _b.lex, errors = _b.errors;
+        // if this block is disabled, we want the parsed spans and such, but we don't want
+        // the block to be in the set sent to the builder
+        if (!extraInfo[block.id].disabled) {
+            if (errors.length) {
+                allErrors.push(errors);
+            }
+            else {
+                results.endOffset = block.endOffset;
+                parsedBlocks.push(results);
+            }
         }
     }
     return {

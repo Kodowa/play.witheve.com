@@ -14,7 +14,7 @@ var httpRequest = require("request");
 var HttpDatabase = (function (_super) {
     __extends(HttpDatabase, _super);
     function HttpDatabase() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     HttpDatabase.prototype.sendRequest = function (evaluation, requestId, request) {
         var _this = this;

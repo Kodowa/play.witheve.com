@@ -13,7 +13,7 @@ var eavs = require("../util/eavs");
 var HttpDatabase = (function (_super) {
     __extends(HttpDatabase, _super);
     function HttpDatabase() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     HttpDatabase.prototype.sendRequest = function (evaluation, requestId, request) {
         var _this = this;
@@ -27,7 +27,7 @@ var HttpDatabase = (function (_super) {
             changes.store(scope, responseId, "tag", "response", _this.id);
             changes.store(scope, responseId, "body", body, _this.id);
             var contentType = oReq.getResponseHeader("content-type");
-            if (contentType && contentType.indexOf("application/json") > -1) {
+            if (contentType && contentType.indexOf("application/json") > -1 && body) {
                 var id = eavs.fromJS(changes, JSON.parse(body), _this.id, scope, responseId + "|json");
                 changes.store(scope, responseId, "json", id, _this.id);
             }
@@ -37,13 +37,13 @@ var HttpDatabase = (function (_super) {
         if (request.method) {
             method = request.method[0];
         }
+        oReq.open(method, request.url[0]);
         if (request.headers) {
             var headers = this.index.asObject(request.headers[0]);
             for (var header in headers) {
                 oReq.setRequestHeader(header, headers[header][0]);
             }
         }
-        oReq.open(method, request.url[0]);
         if (request.body) {
             oReq.send(request.body[0]);
         }

@@ -12,9 +12,8 @@ var providers = require("./index");
 var BooleanOperation = (function (_super) {
     __extends(BooleanOperation, _super);
     function BooleanOperation() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
-    // Greater than never proposes new values for a variable
     BooleanOperation.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
         return [this.compare(args[0], args[1])];
@@ -28,8 +27,6 @@ var BooleanOperation = (function (_super) {
         }
         return;
     };
-    // We accept if our first resolved arg is greater than our
-    // second
     BooleanOperation.prototype.test = function (prefix) {
         var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
         var result = this.compare(args[0], args[1]);
@@ -43,7 +40,7 @@ var BooleanOperation = (function (_super) {
 var Equal = (function (_super) {
     __extends(Equal, _super);
     function Equal() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Equal.prototype.compare = function (a, b) { return a === b; };
     return Equal;
@@ -51,7 +48,7 @@ var Equal = (function (_super) {
 var NotEqual = (function (_super) {
     __extends(NotEqual, _super);
     function NotEqual() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     NotEqual.prototype.compare = function (a, b) { return a !== b; };
     return NotEqual;
@@ -59,7 +56,7 @@ var NotEqual = (function (_super) {
 var GreaterThan = (function (_super) {
     __extends(GreaterThan, _super);
     function GreaterThan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     GreaterThan.prototype.compare = function (a, b) { return a > b; };
     return GreaterThan;
@@ -67,7 +64,7 @@ var GreaterThan = (function (_super) {
 var LessThan = (function (_super) {
     __extends(LessThan, _super);
     function LessThan() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     LessThan.prototype.compare = function (a, b) { return a < b; };
     return LessThan;
@@ -75,7 +72,7 @@ var LessThan = (function (_super) {
 var GreaterThanEqualTo = (function (_super) {
     __extends(GreaterThanEqualTo, _super);
     function GreaterThanEqualTo() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     GreaterThanEqualTo.prototype.compare = function (a, b) { return a >= b; };
     return GreaterThanEqualTo;
@@ -83,7 +80,7 @@ var GreaterThanEqualTo = (function (_super) {
 var LessThanEqualTo = (function (_super) {
     __extends(LessThanEqualTo, _super);
     function LessThanEqualTo() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     LessThanEqualTo.prototype.compare = function (a, b) { return a <= b; };
     return LessThanEqualTo;
@@ -91,7 +88,7 @@ var LessThanEqualTo = (function (_super) {
 var AssertValue = (function (_super) {
     __extends(AssertValue, _super);
     function AssertValue() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     AssertValue.prototype.resolveProposal = function (proposal, prefix) {
         var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
@@ -112,7 +109,7 @@ var AssertValue = (function (_super) {
 var And = (function (_super) {
     __extends(And, _super);
     function And() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     And.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -149,7 +146,7 @@ var And = (function (_super) {
 var Or = (function (_super) {
     __extends(Or, _super);
     function Or() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     // To resolve a proposal, we concatenate our resolved args
     Or.prototype.resolveProposal = function (proposal, prefix) {
@@ -190,7 +187,7 @@ var Or = (function (_super) {
 var Toggle = (function (_super) {
     __extends(Toggle, _super);
     function Toggle() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Toggle.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -206,11 +203,11 @@ var Toggle = (function (_super) {
         proposal.cardinality = 1;
         return proposal;
     };
-    Toggle.AttributeMapping = {
-        "value": 0,
-    };
     return Toggle;
 }(join_1.Constraint));
+Toggle.AttributeMapping = {
+    "value": 0,
+};
 providers.provide(">", GreaterThan);
 providers.provide("<", LessThan);
 providers.provide("<=", LessThanEqualTo);

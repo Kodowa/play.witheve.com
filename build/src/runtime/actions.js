@@ -43,7 +43,7 @@ exports.Action = Action;
 var InsertAction = (function (_super) {
     __extends(InsertAction, _super);
     function InsertAction() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     InsertAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -58,7 +58,7 @@ exports.InsertAction = InsertAction;
 var RemoveAction = (function (_super) {
     __extends(RemoveAction, _super);
     function RemoveAction() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     RemoveAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -73,7 +73,7 @@ exports.RemoveAction = RemoveAction;
 var RemoveSupportAction = (function (_super) {
     __extends(RemoveSupportAction, _super);
     function RemoveSupportAction() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     RemoveSupportAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -89,7 +89,7 @@ exports.RemoveSupportAction = RemoveSupportAction;
 var EraseAction = (function (_super) {
     __extends(EraseAction, _super);
     function EraseAction() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     EraseAction.prototype.removeVs = function (index, changes, scope, e, a) {
         var keys = Object.keys(index);
@@ -129,7 +129,7 @@ exports.EraseAction = EraseAction;
 var SetAction = (function (_super) {
     __extends(SetAction, _super);
     function SetAction() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     SetAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];

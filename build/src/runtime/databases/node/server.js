@@ -12,17 +12,16 @@ var runtime_1 = require("../../runtime");
 var ServerDatabase = (function (_super) {
     __extends(ServerDatabase, _super);
     function ServerDatabase() {
-        _super.call(this);
-        this.requestId = 0;
-        this.receiving = false;
-        this.requestToResponse = {};
+        var _this = _super.call(this) || this;
+        _this.handling = false;
+        _this.requestId = 0;
+        _this.receiving = false;
+        _this.requestToResponse = {};
+        return _this;
     }
     ServerDatabase.prototype.handleHttpRequest = function (request, response) {
-        if (!this.receiving) {
-            // we need to 404
-            response.writeHead(404, { "Content-Type": "text/plain" });
-            return response.end("sad");
-        }
+        if (!this.receiving)
+            return;
         var scopes = ["server"];
         var requestId = "request|" + this.requestId++ + "|" + (new Date()).getTime();
         this.requestToResponse[requestId] = response;
@@ -71,7 +70,7 @@ var ServerDatabase = (function (_super) {
             }
         }
     };
-    ServerDatabase.prototype.sendResponse = function (requestId, status, body) {
+    ServerDatabase.prototype.sendResponse = function (evaluation, requestId, status, body) {
         var response = this.requestToResponse[requestId];
         response.statusCode = status;
         response.end(body);
@@ -89,18 +88,24 @@ var ServerDatabase = (function (_super) {
                 handled[e] = true;
                 if (index.lookup(e, "tag", "request") && !index.lookup(e, "tag", "sent")) {
                     var responses = index.asValues(e, "response");
+                    if (responses || index.lookup(e, "tag", "handling"))
+                        this.handling = true;
                     if (responses === undefined)
                         continue;
                     var response = responses[0];
                     var _c = index.asObject(response), status_1 = _c.status, body = _c.body;
                     actions.push(new actions_1.InsertAction("server|sender", e, "tag", "sent", undefined, [name]));
-                    this.sendResponse(e, status_1[0], body[0]);
+                    this.sendResponse(evaluation, e, status_1[0], body[0]);
                 }
             }
         }
         if (actions.length) {
             process.nextTick(function () {
                 evaluation.executeActions(actions);
+                // because this database is created per http request, we need to destroy this
+                // evaluation once a response has been sent and we've dealt with any consequences
+                // of the send.
+                evaluation.close();
             });
         }
         var _a;

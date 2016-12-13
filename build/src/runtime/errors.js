@@ -22,9 +22,9 @@ var EveError = (function () {
         spans.push(this.start, this.stop, SPAN_TYPE, this.id);
         extraInfo[this.id] = this;
     };
-    EveError.ID = 0;
     return EveError;
 }());
+EveError.ID = 0;
 //--------------------------------------------------------------
 // Parse error utils
 //--------------------------------------------------------------
@@ -168,6 +168,12 @@ function unprovidedVariableGroup(block, variables) {
     return new EveError(id, start, stop, exports.messages.unprovidedVariable(found.name));
 }
 exports.unprovidedVariableGroup = unprovidedVariableGroup;
+function blankScan(block, scan) {
+    var id = block.id, blockStart = block.start;
+    var _a = parser.nodeToBoundaries(scan, blockStart), start = _a[0], stop = _a[1];
+    return new EveError(id, start, stop, exports.messages.blankScan());
+}
+exports.blankScan = blankScan;
 function invalidLookupAction(block, action) {
     var id = block.id, blockStart = block.start;
     var _a = parser.nodeToBoundaries(action, blockStart), start = _a[0], stop = _a[1];
@@ -219,14 +225,15 @@ var PairToName = {
     "\"": "quote",
 };
 exports.messages = {
-    unclosedPair: function (type) { return ("Looks like a close " + PairToName[type] + " is missing"); },
-    extraCloseChar: function (char) { return ("This close " + PairToName[char] + " is missing an open " + PairToName[char]); },
-    unprovidedVariable: function (varName) { return ("Nothing is providing a value for " + varName); },
-    unimplementedExpression: function (op) { return ("There's no definition for the function " + op); },
-    invalidLookupAction: function (missing) { return ("Updating a lookup requires that record, attribute, and value all be provided. Looks like " + missing.join("and") + " is missing."); },
-    neverEqual: function (left, right) { return (left + " can never equal " + right); },
-    variableNeverEqual: function (variable, value, right) { return (variable.name + " is equivalent to " + value + ", which can't be equal to " + right); },
-    actionNonTag: function (found) { return ("Looks like this should be a tag, try changing the " + found + " to a #"); },
-    actionRawIdentifier: function (found) { return ("I can only add/remove tags directly on a record. If you meant to add " + found + " as an attribute to the record, try 'my-record.found += " + found + "'; if you meant to add the #" + found + " tag, add #."); }
+    unclosedPair: function (type) { return "Looks like a close " + PairToName[type] + " is missing"; },
+    extraCloseChar: function (char) { return "This close " + PairToName[char] + " is missing an open " + PairToName[char]; },
+    unprovidedVariable: function (varName) { return "Nothing is providing a value for " + varName; },
+    unimplementedExpression: function (op) { return "There's no definition for the function " + op; },
+    blankScan: function () { return 'Lookup requires at least one attribute: record, attribute, value, or node'; },
+    invalidLookupAction: function (missing) { return "Updating a lookup requires that record, attribute, and value all be provided. Looks like " + missing.join("and") + " is missing."; },
+    neverEqual: function (left, right) { return left + " can never equal " + right; },
+    variableNeverEqual: function (variable, value, right) { return variable.name + " is equivalent to " + value + ", which can't be equal to " + right; },
+    actionNonTag: function (found) { return "Looks like this should be a tag, try changing the " + found + " to a #"; },
+    actionRawIdentifier: function (found) { return "I can only add/remove tags directly on a record. If you meant to add " + found + " as an attribute to the record, try 'my-record.found += " + found + "'; if you meant to add the #" + found + " tag, add #."; }
 };
 //# sourceMappingURL=errors.js.map

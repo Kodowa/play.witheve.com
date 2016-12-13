@@ -138,12 +138,7 @@ var Scan = (function () {
         var solving = [];
         var solveNode = this.node !== undefined;
         var depth = solveNode ? 4 : 3;
-        if (a !== undefined) {
-            this._fullScanLookup(index.aveIndex, solving, results, [a, v, e, node], 0, 0, depth);
-        }
-        else {
-            this._fullScanLookup(index.eavIndex, solving, results, resolved, 0, 0, depth);
-        }
+        this._fullScanLookup(index.eavIndex, solving, results, resolved, 0, 0, depth);
         return results;
     };
     Scan.prototype.setProposal = function (index, toProvide, scopeIx) {
@@ -395,7 +390,7 @@ exports.Constraint = Constraint;
 var GenerateId = (function (_super) {
     __extends(GenerateId, _super);
     function GenerateId() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     GenerateId.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -433,8 +428,14 @@ var NotScan = (function () {
     };
     NotScan.prototype.propose = function () { return; };
     NotScan.prototype.resolveProposal = function () { throw new Error("Resolving a not proposal"); };
-    NotScan.prototype.accept = function (multiIndex, prefix, solvingFor, force) {
-        if (!force && !this.internalVars[solvingFor.id] && this.internalVars.length || !fullyResolved(this.args, prefix))
+    NotScan.prototype.accept = function (multiIndex, prefix, solvingFor, force, prejoin) {
+        // if we're in the prejoin phase and this not has no args, then we need
+        // to evaluate the not to see if we should run. If we didn't do this, arg-less
+        // nots won't get evaluated during Generic Join since we're never solving for a
+        // variable that this scan cares about.
+        if ((!prejoin || this.args.length)
+            && (!force && !this.internalVars[solvingFor.id] && this.internalVars.length)
+            || !fullyResolved(this.args, prefix))
             return true;
         var resolved = this.resolve(prefix);
         var notPrefix = [];
@@ -512,18 +513,26 @@ var IfScan = (function () {
         this.outputs = outputs;
         this.hasAggregate = hasAggregate;
         this.resolved = [];
+        this.resolvedOutputs = [];
+        this.hasResolvedOutputs = false;
         var blockVars = [];
+        this.vars = args.slice();
         for (var _i = 0, branches_1 = branches; _i < branches_1.length; _i++) {
             var branch = branches_1[_i];
             if (branch.exclusive)
                 this.exclusive = true;
-            block_1.scansToVars(branch.strata, blockVars);
         }
-        this.vars = args.slice();
         for (var _a = 0, outputs_2 = outputs; _a < outputs_2.length; _a++) {
             var output = outputs_2[_a];
-            if (output !== undefined) {
+            if (output !== undefined && isVariable(output)) {
                 this.vars[output.id] = output;
+                blockVars[output.id] = output;
+            }
+        }
+        for (var _b = 0, args_1 = args; _b < args_1.length; _b++) {
+            var arg = args_1[_b];
+            if (isVariable(arg)) {
+                blockVars[arg.id] = arg;
             }
         }
         this.args = args;
@@ -533,10 +542,34 @@ var IfScan = (function () {
     IfScan.prototype.resolve = function (prefix) {
         return resolve(this.args, prefix, this.resolved);
     };
+    IfScan.prototype.resolveOutputs = function (prefix) {
+        this.hasResolvedOutputs = false;
+        var resolved = resolve(this.outputs, prefix, this.resolvedOutputs);
+        for (var _i = 0, resolved_1 = resolved; _i < resolved_1.length; _i++) {
+            var item = resolved_1[_i];
+            if (item !== undefined) {
+                this.hasResolvedOutputs = true;
+                break;
+            }
+        }
+        return resolved;
+    };
+    IfScan.prototype.checkOutputs = function (resolved, row) {
+        if (!this.hasResolvedOutputs)
+            return true;
+        var ix = 0;
+        for (var _i = 0, resolved_2 = resolved; _i < resolved_2.length; _i++) {
+            var item = resolved_2[_i];
+            if (item !== undefined && item !== row[ix]) {
+                return false;
+            }
+        }
+        return true;
+    };
     IfScan.prototype.getProposal = function (multiIndex, proposed, proposedIx, prefix) {
         var proposalValues = [];
         var cardinality = 0;
-        var outputs = this.outputs;
+        var resolvedOutputs = this.resolveOutputs(prefix);
         var projection = {};
         for (var _i = 0, _a = this.branches; _i < _a.length; _i++) {
             var branch = _a[_i];
@@ -551,6 +584,9 @@ var IfScan = (function () {
                         var output = _d[_c];
                         var value = toValue(output, row);
                         outputRow.push(value);
+                    }
+                    if (!this.checkOutputs(resolvedOutputs, outputRow)) {
+                        continue;
                     }
                     var key = outputRow.join("|");
                     if (projection[key] === undefined) {
@@ -594,20 +630,15 @@ var IfScan = (function () {
     IfScan.prototype.accept = function (multiIndex, prefix, solvingFor, force) {
         if (!force && !this.internalVars[solvingFor.id] || !fullyResolved(this.args, prefix))
             return true;
-        var resolved = this.resolve(prefix);
         for (var _i = 0, _a = this.branches; _i < _a.length; _i++) {
             var branch = _a[_i];
-            var branchPrefix = branch.resolve(prefix);
-            var accepted = true;
             for (var _b = 0, _c = branch.strata; _b < _c.length; _b++) {
                 var stratum = _c[_b];
-                var result = preJoinAccept(multiIndex, stratum.scans, stratum.vars, branchPrefix);
-                accepted = result.accepted;
-                if (!accepted)
-                    break;
+                var result = preJoinAccept(multiIndex, stratum.scans, stratum.vars, prefix);
+                if (result.accepted) {
+                    return true;
+                }
             }
-            if (accepted)
-                return true;
         }
         return false;
     };
@@ -735,12 +766,22 @@ function preJoinAccept(multiIndex, providers, vars, prefix) {
             presolved++;
             for (var _a = 0, providers_3 = providers; _a < providers_3.length; _a++) {
                 var provider = providers_3[_a];
-                if (!provider.accept(multiIndex, prefix, solvingFor)) {
+                if (!provider.accept(multiIndex, prefix, solvingFor, false, true)) {
                     return { accepted: false, presolved: presolved };
                 }
             }
         }
         ix++;
+    }
+    // we still need to do a single prejoin pass to make sure that any nots
+    // that may have no external dependencies are given a chance to end this
+    // evaluation
+    var fakeVar = new Variable(0);
+    for (var _b = 0, providers_4 = providers; _b < providers_4.length; _b++) {
+        var provider = providers_4[_b];
+        if (provider instanceof NotScan && !provider.accept(multiIndex, prefix, fakeVar, false, true)) {
+            return { accepted: false, presolved: presolved };
+        }
     }
     return { accepted: true, presolved: presolved };
 }
@@ -765,8 +806,8 @@ function join(multiIndex, providers, vars, prefix, options) {
         rows.push(prefix.slice());
     }
     else if (rounds === 0) {
-        for (var _b = 0, providers_4 = providers; _b < providers_4.length; _b++) {
-            var provider = providers_4[_b];
+        for (var _b = 0, providers_5 = providers; _b < providers_5.length; _b++) {
+            var provider = providers_5[_b];
             if (!provider.accept(multiIndex, prefix, null, true)) {
                 return rows;
             }

@@ -4,7 +4,7 @@
 "use strict";
 var performance_1 = require("./performance");
 var TRACK_PERFORMANCE = true;
-var MAX_ROUNDS = 30;
+var MAX_ROUNDS = 300;
 var indexes_1 = require("./indexes");
 var changes_1 = require("./changes");
 var id_1 = require("./id");
@@ -51,9 +51,9 @@ var Database = (function () {
         return this.index.toTriples(true);
     };
     Database.prototype.analyze = function (e, d) { };
-    Database.id = 1;
     return Database;
 }());
+Database.id = 1;
 exports.Database = Database;
 //---------------------------------------------------------------------
 // Evaluation
@@ -93,7 +93,7 @@ var Evaluation = (function () {
     };
     Evaluation.prototype.registerDatabase = function (name, db) {
         if (this.nameToDatabase[name]) {
-            throw new Error("Trying to register a database name that is already registered");
+            throw new Error("Trying to register a database name that is already registered: " + name);
         }
         for (var _i = 0, _a = this.databases; _i < _a.length; _i++) {
             var database = _a[_i];

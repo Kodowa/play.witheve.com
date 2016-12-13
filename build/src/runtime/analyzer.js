@@ -11,8 +11,7 @@ var parser_1 = require("./parser");
 var runtime_1 = require("./runtime");
 var parser = require("./parser");
 var builder = require("./builder");
-var browser = require("./browser");
-var browserSession_1 = require("./databases/browserSession");
+var eveSource = require("./eveSource");
 var ActionType;
 (function (ActionType) {
     ActionType[ActionType["Bind"] = 0] = "Bind";
@@ -328,9 +327,10 @@ var Analysis = (function () {
 var EditorDatabase = (function (_super) {
     __extends(EditorDatabase, _super);
     function EditorDatabase(spans, extraInfo) {
-        _super.call(this);
-        this.spans = spans;
-        this.extraInfo = extraInfo;
+        var _this = _super.call(this) || this;
+        _this.spans = spans;
+        _this.extraInfo = extraInfo;
+        return _this;
     }
     EditorDatabase.prototype.onFixpoint = function (evaluation, changes) {
         _super.prototype.onFixpoint.call(this, evaluation, changes);
@@ -353,18 +353,18 @@ exports.EditorDatabase = EditorDatabase;
 function makeEveAnalyzer() {
     if (eve)
         return eve;
-    var _a = parser.parseDoc(global["examples"]["analyzer.eve"], "analyzer"), results = _a.results, errors = _a.errors;
+    var _a = parser.parseDoc(eveSource.get("analyzer.eve"), "analyzer"), results = _a.results, errors = _a.errors;
     var text = results.text, spans = results.spans, extraInfo = results.extraInfo;
     var _b = builder.buildDoc(results), blocks = _b.blocks, buildErrors = _b.errors;
     if (errors.length || buildErrors.length) {
         console.error("ANALYZER CREATION ERRORS", errors, buildErrors);
     }
-    var browserDb = new browserSession_1.BrowserSessionDatabase(browser.responder);
+    // let browserDb = new BrowserSessionDatabase(browser.responder);
     var session = new runtime_1.Database();
     session.blocks = blocks;
     var evaluation = new runtime_1.Evaluation();
     evaluation.registerDatabase("session", session);
-    evaluation.registerDatabase("browser", browserDb);
+    // evaluation.registerDatabase("browser", browserDb);
     return evaluation;
 }
 var eve;
@@ -388,7 +388,7 @@ function analyze(blocks, spans, extraInfo) {
         analysis.block(block, spans, extraInfo);
     }
     changes.commit();
-    console.log(changes);
+    // console.log(changes);
     console.timeEnd("load analysis");
     // eve.executeActions([], changes);
 }

@@ -14,10 +14,10 @@ var renderer_1 = require("./renderer");
 var client_1 = require("./client");
 var Navigator = (function () {
     function Navigator(ide, rootId, nodes, currentId) {
-        var _this = this;
         if (rootId === void 0) { rootId = "root"; }
         if (nodes === void 0) { nodes = { root: { type: "folder", name: "/", children: [] } }; }
         if (currentId === void 0) { currentId = rootId; }
+        var _this = this;
         this.ide = ide;
         this.rootId = rootId;
         this.nodes = nodes;
@@ -27,6 +27,7 @@ var Navigator = (function () {
             document: "Table of Contents"
         };
         this.open = true;
+        this.loadDialogOpen = false;
         // Event Handlers
         this.togglePane = function (event, elem) {
             _this.open = !_this.open;
@@ -86,7 +87,7 @@ var Navigator = (function () {
         };
         this.toggleInspectorFocus = function () {
             if (_this.isFocused()) {
-                client_1.sendEvent([{ tag: ["inspector", "unfocus-current"] }]);
+                client_1.client.sendEvent([{ tag: ["inspector", "unfocus-current"] }]);
                 for (var nodeId in _this.nodes) {
                     var node = _this.nodes[nodeId];
                     if (!node)
@@ -97,8 +98,41 @@ var Navigator = (function () {
                 _this.updateElision();
             }
             else {
-                client_1.sendEvent([{ tag: ["inspector", "focus-current"] }]);
+                client_1.client.sendEvent([{ tag: ["inspector", "focus-current"] }]);
             }
+        };
+        this.createDocument = function (event, _a) {
+            var nodeId = _a.nodeId;
+            // @FIXME: This needs to be keyed off nodeId, not name for multi-level workspaces.
+            // Top level node id is currently hardwired for what I imagine seemed like a good reason at the time.
+            var node = _this.nodes[nodeId];
+            if (!node)
+                return;
+            _this.ide.createDocument(node.name);
+            node.name;
+        };
+        this.toggleLoadDialog = function () {
+            _this.loadDialogOpen = !_this.loadDialogOpen;
+            _this.ide.render();
+        };
+        this.loadDialogInput = function (event) {
+            var input = event.target;
+            _this.loadDialogValue = input.value;
+        };
+        this.loadFromDialog = function (event) {
+            if (event instanceof KeyboardEvent) {
+                if (event.keyCode === 27) {
+                    _this.loadDialogValue = undefined;
+                    _this.loadDialogOpen = false;
+                    _this.ide.render();
+                }
+                if (event.keyCode !== 13)
+                    return; // Enter
+            }
+            _this.ide.loadFromGist(_this.loadDialogValue);
+            _this.loadDialogValue = undefined;
+            _this.loadDialogOpen = false;
+            _this.ide.render();
         };
     }
     Navigator.prototype.currentType = function () {
@@ -122,7 +156,7 @@ var Navigator = (function () {
         var root = this.nodes[id] = { id: id, name: name, type: "folder", open: true };
         var parent = root;
         for (var curId in files) {
-            var node = { id: curId, name: curId, type: "document" };
+            var node = { id: curId, name: curId.split("/").pop(), type: "document" };
             this.nodes[curId] = node;
             if (!parent.children)
                 parent.children = [curId];
@@ -146,8 +180,11 @@ var Navigator = (function () {
         var headings = editor.getAllSpans("heading");
         headings.sort(spans_1.compareSpans);
         var root = this.nodes[id];
-        if (!root)
-            throw new Error("Cannot load non-existent document.");
+        if (!root) {
+            //console.error("Cannot load non-existent document.");
+            //return;
+            root = this.nodes[id] = { id: id, type: "document", name: name };
+        }
         root.open = true;
         root.children = undefined;
         var stack = [root];
@@ -307,7 +344,7 @@ var Navigator = (function () {
                 { c: "flex-row", children: [
                         { c: "label " + (subtree ? "ion-ios-arrow-down" : "no-icon"), text: node.name, nodeId: nodeId, click: subtree ? this.toggleBranch : this.navigate },
                         { c: "controls", children: [
-                                subtree ? { c: "new-btn ion-ios-plus-empty", click: function () { return console.log("new folder or document"); } } : undefined,
+                                subtree ? { c: "new-btn ion-ios-plus-empty", nodeId: nodeId, click: this.createDocument } : undefined,
                                 { c: "delete-btn ion-ios-close-empty", click: function () { return console.log("delete folder or document w/ confirmation"); } }
                             ] }
                     ] },
@@ -350,17 +387,26 @@ var Navigator = (function () {
             ] };
     };
     Navigator.prototype.header = function () {
+        var _this = this;
         var type = this.currentType();
         return { c: "navigator-header", children: [
                 { c: "controls", children: [
-                        this.open ? { c: "up-btn flex-row", click: this.navigate, children: [
-                                { c: "up-btn ion-android-arrow-up " + ((type === "folder") ? "disabled" : "") },
-                                { c: "label", text: "examples" },
+                        this.open ? { c: "up-btn flex-row  " + ((this.currentId === this.rootId) ? "disabled" : ""), click: this.navigate, children: [
+                                { c: "up-icon ion-android-arrow-up" },
+                                { c: "label", text: "workspaces" }
                             ] } : undefined,
                         { c: "flex-spacer" },
-                        { c: (this.open ? "expand-btn" : "collapse-btn") + " ion-ios-arrow-back", click: this.togglePane },
+                        this.open ? { c: "ion-ios-cloud-upload-outline btn", title: "Save to Gist", click: function () { return _this.ide.saveToGist(); } } : undefined,
+                        this.open ? { c: "ion-ios-cloud-download-outline btn", title: "Load from Gist", click: this.toggleLoadDialog } : undefined,
+                        { c: (this.open ? "expand-btn" : "collapse-btn") + " ion-ios-arrow-back btn", title: this.open ? "Expand" : "Collapse", click: this.togglePane },
                     ] },
                 this.ide.inspecting ? this.inspectorControls() : { c: "inspector-controls" },
+            ] };
+    };
+    Navigator.prototype.loadDialog = function () {
+        return { c: "load-dialog flex-row", children: [
+                { t: "input", c: "flex-spacer", type: "url", autofocus: true, placeholder: "Enter gist url to load...", input: this.loadDialogInput, keydown: this.loadFromDialog },
+                { c: "btn load-btn ion-arrow-right-b", style: "padding: 0 10", click: this.loadFromDialog }
             ] };
     };
     Navigator.prototype.render = function () {
@@ -370,6 +416,7 @@ var Navigator = (function () {
             return { c: "navigator-pane", children: [
                     { c: "navigator-pane-inner", children: [
                             this.header(),
+                            this.loadDialogOpen ? this.loadDialog() : undefined,
                             { c: "new-btn ion-ios-plus-empty", click: function () { return console.log("new folder or document"); } }
                         ] }
                 ] };
@@ -383,6 +430,7 @@ var Navigator = (function () {
         return { c: "navigator-pane " + (this.open ? "" : "collapsed"), click: this.open ? undefined : this.togglePane, children: [
                 { c: "navigator-pane-inner", children: [
                         this.header(),
+                        this.loadDialogOpen ? this.loadDialog() : undefined,
                         tree
                     ] }
             ] };
@@ -515,8 +563,9 @@ exports.Change = Change;
 var ChangeLinkedList = (function (_super) {
     __extends(ChangeLinkedList, _super);
     function ChangeLinkedList(_raw) {
-        _super.call(this, _raw);
-        this._raw = _raw;
+        var _this = _super.call(this, _raw) || this;
+        _this._raw = _raw;
+        return _this;
     }
     /** Next change object in sequence, if any. */
     ChangeLinkedList.prototype.next = function () {
@@ -530,8 +579,9 @@ function isRangeChange(x) {
 var ChangeCancellable = (function (_super) {
     __extends(ChangeCancellable, _super);
     function ChangeCancellable(_raw) {
-        _super.call(this, _raw);
-        this._raw = _raw;
+        var _this = _super.call(this, _raw) || this;
+        _this._raw = _raw;
+        return _this;
     }
     Object.defineProperty(ChangeCancellable.prototype, "canceled", {
         get: function () { return this._raw.canceled; },
@@ -550,7 +600,7 @@ exports.ChangeCancellable = ChangeCancellable;
 var ChangeInverted = (function (_super) {
     __extends(ChangeInverted, _super);
     function ChangeInverted() {
-        _super.apply(this, arguments);
+        return _super.apply(this, arguments) || this;
     }
     Object.defineProperty(ChangeInverted.prototype, "text", {
         /** Lines of text that used to be between from and to, which is overwritten by this change. */
@@ -647,7 +697,16 @@ var Editor = (function () {
                 "Cmd-1": function () { return _this.format({ type: "heading", level: 1 }); },
                 "Cmd-2": function () { return _this.format({ type: "heading", level: 2 }); },
                 "Cmd-3": function () { return _this.format({ type: "heading", level: 3 }); },
-                "Cmd-L": function () { return _this.format({ type: "item" }); }
+                "Cmd-L": function () { return _this.format({ type: "item" }); },
+                "Tab": function (cm) {
+                    if (cm.somethingSelected()) {
+                        cm.indentSelection("add");
+                    }
+                    else {
+                        cm.replaceSelection(cm.getOption("indentWithTabs") ? "\t" :
+                            Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+                    }
+                }
             })
         };
         /** Whether the editor has changed since the last update. */
@@ -1773,7 +1832,8 @@ var Comments = (function () {
                         comment.message ? { c: "message", text: comment.message } : undefined,
                         actions.length ? { c: "quick-actions", children: actions } : undefined,
                     ] }
-            ] };
+            ]
+        };
     };
     Comments.prototype.render = function () {
         var children = [];
@@ -1821,7 +1881,8 @@ function newBlockBar(elem) {
                     editor.queueUpdate();
                 } },
             { c: "flex-row controls", children: [
-                    { text: "block", click: function () { return editor.format({ type: "code_block" }, true); } },
+                    { text: "Eve", click: function () { return editor.format({ type: "code_block" }, true); } },
+                    { text: "CSS", click: function () { return editor.format({ type: "code_block", info: "css" }, true); } },
                     { text: "list", click: function () { return editor.format({ type: "item" }, true); } },
                     { text: "H1", click: function () { return editor.format({ type: "heading", level: 1 }, true); } },
                     { text: "H2", click: function () { return editor.format({ type: "heading", level: 2 }, true); } },
@@ -1856,6 +1917,8 @@ var IDE = (function () {
         this.generation = 0;
         /** Whether the currently open document is a modified version of an example. */
         this.modified = false;
+        /** Whether or not files are stored and operated on purely locally */
+        this.local = false;
         /** Whether the inspector is currently active. */
         this.inspecting = false;
         /** Whether the next click should be an inspector click automatically (as opposed to requiring Cmd or Ctrl modifiers. */
@@ -1866,6 +1929,18 @@ var IDE = (function () {
         this.navigator = new Navigator(this);
         this.editor = new Editor(this);
         this.comments = new Comments(this);
+        this.loadExisting = function () {
+            var id = _this.overwriteId;
+            _this.overwriteId = undefined;
+            _this.loadFile(id);
+            _this.render();
+        };
+        this.overwriteDocument = function () {
+            var id = _this.overwriteId;
+            _this.overwriteId = undefined;
+            _this.cloneDocument(id);
+            _this.render();
+        };
         this.queueUpdate = util_1.debounce(function (shouldEval) {
             if (shouldEval === void 0) { shouldEval = false; }
             if (_this.editor.dirty) {
@@ -1873,7 +1948,7 @@ var IDE = (function () {
                 if (_this.onChange)
                     _this.onChange(_this);
                 _this.editor.dirty = false;
-                client_1.sendEvent([{ tag: ["inspector", "clear"] }]);
+                client_1.client.sendEvent([{ tag: ["inspector", "clear"] }]);
                 _this.saveDocument();
                 if (shouldEval) {
                     if (_this.documentId === "quickstart.eve") {
@@ -2044,7 +2119,7 @@ var IDE = (function () {
                             var record = records_1[_d];
                             record.action = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }
                 },
                 "elide-between-sections": function (action, actionId) {
@@ -2096,7 +2171,7 @@ var IDE = (function () {
                             record_1.tag.push("editor");
                             record_1["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-related": function (action, actionId) {
@@ -2106,7 +2181,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-value": function (action, actionId) {
@@ -2126,7 +2201,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-cardinality": function (action, actionId) {
@@ -2136,7 +2211,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-affector": function (action, actionId) {
@@ -2150,7 +2225,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-failure": function (action, actionId) {
@@ -2160,7 +2235,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-root-drawers": function (action, actionId) {
@@ -2170,7 +2245,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "find-performance": function (action, actionId) {
@@ -2180,7 +2255,7 @@ var IDE = (function () {
                             record.tag.push("editor");
                             record["action"] = actionId;
                         }
-                        client_1.sendEvent(records);
+                        client_1.client.sendEvent(records);
                     }));
                 },
                 "inspector": function (action, actionId) {
@@ -2272,7 +2347,7 @@ var IDE = (function () {
             }
             _this.queueUpdate();
             if (events.length) {
-                client_1.sendEvent(events);
+                client_1.client.sendEvent(events);
                 event.preventDefault();
                 event.stopPropagation();
             }
@@ -2288,54 +2363,102 @@ var IDE = (function () {
                 { c: "main-pane", children: [
                         this.noticesElem(),
                         this.editor.render(),
+                        this.overwriteId ? this.overwritePrompt() : undefined,
                     ] },
                 this.comments.render()
             ] };
     };
     IDE.prototype.noticesElem = function () {
+        var _this = this;
         var items = [];
         for (var _i = 0, _a = this.notices; _i < _a.length; _i++) {
             var notice = _a[_i];
             var time = new Date(notice.time);
+            var formattedMinutes = time.getMinutes() >= 10 ? time.getMinutes() : "0" + time.getMinutes();
+            var formattedSeconds = time.getSeconds() >= 10 ? time.getMinutes() : "0" + time.getSeconds();
             items.push({ c: "notice " + notice.type + " flex-row", children: [
-                    { c: "time", text: time.getHours() + ":" + time.getMinutes() + ":" + time.getSeconds() },
-                    { c: "message", text: notice.message }
+                    { c: "time", text: time.getHours() + ":" + formattedMinutes + ":" + formattedSeconds },
+                    { c: "message", children: [(typeof notice.message === "function") ? notice.message() : { text: notice.message }] },
+                    { c: "flex-spacer" },
+                    { c: "dismiss-btn ion-close-round", notice: notice, click: function (event, elem) { return _this.dismissNotice(elem.notice); } }
                 ] });
         }
         if (items.length) {
             return { c: "notices", children: items };
         }
     };
+    IDE.prototype.overwritePrompt = function () {
+        return { c: "modal-overlay", children: [
+                { c: "modal-window", children: [
+                        { t: "h3", text: "Overwrite existing copy?" },
+                        { c: "flex-row controls", children: [
+                                { c: "btn load-btn", text: "load existing", click: this.loadExisting },
+                                { c: "btn danger overwrite-btn", text: "overwrite", click: this.overwriteDocument },
+                            ] }
+                    ] }
+            ] };
+    };
+    IDE.prototype.promptOverwrite = function (neueId) {
+        this.overwriteId = neueId;
+        this.render();
+    };
     IDE.prototype.render = function () {
         // Update child states as necessary
         this.renderer.render([this.elem()]);
     };
-    IDE.prototype.loadFile = function (docId) {
-        if (this.loading || this.documentId === docId)
-            return;
+    IDE.prototype.loadFile = function (docId, content) {
+        if (!docId)
+            return false;
+        if (docId === this.documentId)
+            return false;
+        if (this.loading)
+            return false;
+        // We're loading from a remote gist
+        if (docId.indexOf("gist:") === 0 && !content) {
+            var gistId = docId.slice(5);
+            if (gistId.indexOf("-") !== -1)
+                gistId = gistId.slice(0, gistId.indexOf("-"));
+            var gistUrl = "https://gist.githubusercontent.com/raw/" + gistId;
+            this.loadFromGist(gistUrl);
+            return true;
+        }
         var saves = JSON.parse(localStorage.getItem("eve-saves") || "{}");
-        var code = saves[docId];
-        if (code) {
+        if (this.local && saves[docId]) {
+            content = saves[docId];
             this.modified = true;
         }
-        else {
-            code = this._fileCache[docId];
+        else if (content) {
+            this._fileCache[docId] = content;
+        }
+        else if (this._fileCache[docId]) {
+            content = this._fileCache[docId];
             this.modified = false;
         }
-        if (!code)
-            throw new Error("Unable to load uncached file: '" + docId + "'");
+        if (content === undefined) {
+            console.error("Unable to load uncached file: '" + docId + "'");
+            return false;
+        }
         this.loaded = false;
         this.documentId = docId;
         this.editor.reset();
         this.notices = [];
         this.loading = true;
-        this.onLoadFile(this, docId, code);
+        this.onLoadFile(this, docId, content);
+        return true;
     };
     IDE.prototype.loadWorkspace = function (directory, files) {
+        // @FIXME: un-hardcode root to enable multiple WS's.
         this._fileCache = files;
+        if (this.local) {
+            // Mix in any saved documents in localStorage.
+            var saves = JSON.parse(localStorage.getItem("eve-saves") || "{}");
+            for (var save in saves) {
+                files[save] = saves[save];
+            }
+        }
         this.navigator.loadWorkspace("root", directory, files);
     };
-    IDE.prototype.loadDocument = function (generation, text, packed, attributes) {
+    IDE.prototype.loadDocument = function (generation, text, packed, attributes, css) {
         if (generation < this.generation && generation !== undefined)
             return;
         if (this.loaded) {
@@ -2354,19 +2477,50 @@ var IDE = (function () {
         }
         else {
         }
+        document.getElementById("app-styles").innerHTML = css;
+        document.getElementsByClassName("CodeMirror")[0].classList.remove("cm-s-default"); // remove document wide code-styling
         this.render();
     };
     IDE.prototype.saveDocument = function () {
         if (!this.documentId || !this.loaded)
             return;
-        var saves = JSON.parse(localStorage.getItem("eve-saves") || "{}");
+        // When we try to edit a gist-backed file we need to fork it and save the new file to disk.
+        // @FIXME: This is all terribly hacky, and needs to be cleaned up as part of the FileStore rework.
+        if (this.documentId.indexOf("gist:") === 0) {
+            var oldId = this.documentId;
+            var neueId = oldId.slice(5);
+            neueId = neueId.slice(0, 7) + neueId.slice(32);
+            neueId = "/root/" + neueId;
+            if (this._fileCache[neueId]) {
+                return this.promptOverwrite(neueId);
+            }
+            else {
+                return this.cloneDocument(neueId);
+            }
+        }
         var md = this.editor.toMarkdown();
-        if (md !== this._fileCache[this.documentId]) {
+        var isDirty = md !== this._fileCache[this.documentId];
+        // @NOTE: We sync this here to prevent a terrible reload bug that occurs when saving to the file system.
+        // This isn't really the right fix, but it's a quick one that helps prevent lost work in trivial cases
+        // like navigating the workspace.
+        // @TODO: This logic needs ripped out entirely and replaced with a saner abstraction that keeps the
+        // file system and workspace in sync.
+        // @TODO: localStorage also needs to get synced and cleared lest it permanently overrule other sources of truth.
+        this._fileCache[this.documentId] = md;
+        // if we're not local, we notify the outside world that we're trying
+        // to save
+        if (!this.local) {
+            return this.onSaveDocument(this, this.documentId, md);
+        }
+        // othewise, save it to local storage
+        var saves = JSON.parse(localStorage.getItem("eve-saves") || "{}");
+        if (isDirty) {
             saves[this.documentId] = md;
             this.modified = true;
         }
         else {
             this.modified = false;
+            saves[this.documentId] = undefined;
         }
         localStorage.setItem("eve-saves", JSON.stringify(saves));
     };
@@ -2380,6 +2534,89 @@ var IDE = (function () {
         this.documentId = undefined;
         this.loadFile(docId);
     };
+    IDE.prototype.cloneDocument = function (neueId) {
+        var oldId = this.documentId;
+        this.documentId = neueId;
+        var navNode = this.navigator.nodes[oldId];
+        if (navNode) {
+            var neueNode = {};
+            for (var attr in navNode) {
+                neueNode[attr] = navNode[attr];
+            }
+            neueNode.id = neueId;
+            neueNode.name = neueId.split("/").pop();
+            neueNode.children = [];
+            this.navigator.nodes[neueId] = neueNode;
+        }
+        if (this.navigator.currentId === oldId)
+            this.navigator.currentId = neueId;
+        var currentHashChunks = location.hash.split("#").slice(1);
+        var modified = neueId;
+        if (currentHashChunks[1]) {
+            modified += "/#" + currentHashChunks[1];
+        }
+        location.hash = modified;
+        this.saveDocument();
+        this.navigator.loadDocument(neueId, neueId);
+        // @FIXME: Will break in multi-workspace.
+        this.navigator.nodes[this.navigator.rootId].children.push(neueId);
+    };
+    IDE.prototype.saveToGist = function () {
+        var _this = this;
+        // @FIXME: We really need a display name setup for documents.
+        var savingNotice = this.injectNotice("info", "Saving...");
+        util_1.writeToGist(this.documentId || "Untitled.eve", this.editor.toMarkdown(), function (err, url) {
+            _this.dismissNotice(savingNotice);
+            if (err) {
+                _this.injectNotice("error", "Unable to save file to gist. Check the developer console for more information.");
+                console.error(err);
+            }
+            else {
+                _this.injectNotice("info", function () { return ({ c: "flex-row", children: [{ text: "Saved to", style: "padding-right: 5px;" }, { t: "a", href: url, target: "_blank", text: "gist" }] }); });
+            }
+        });
+    };
+    IDE.prototype.loadFromGist = function (url) {
+        var _this = this;
+        if (!url) {
+            this.injectNotice("warning", "Unable to open gist: No URL provided.");
+            return;
+        }
+        util_1.readFromGist(url, function (err, gist) {
+            if (err) {
+                _this.injectNotice("error", "Unable to read gist. Check the developer console for more information.");
+                console.error(err);
+            }
+            else {
+                //console.log(content);
+                // @FIXME: Need the filename metadata here.
+                // @FIXME: Should really be more flexible and provide all the files attached (can load a workspace from gist).
+                for (var filename in gist.files) {
+                    var content = gist.files[filename].content;
+                    var docId = "gist:" + gist.id + "-" + filename;
+                    _this.loadFile(docId, content);
+                }
+            }
+        });
+    };
+    IDE.prototype.createDocument = function (folder) {
+        var newId;
+        var ix = 0;
+        while (!newId) {
+            newId = "/" + folder + "/untitled" + (ix ? "-" + ix : "") + ".eve";
+            if (this._fileCache[newId])
+                newId = undefined;
+        }
+        var emptyTemplate = "# Untitled";
+        this._fileCache[newId] = emptyTemplate;
+        // @FIXME: Need a way to side-load a single node that isn't hardwired to a span.
+        // Split the current updateNode up.
+        // @FIXME: This won't work with multiple workspaces obviously.
+        this.loadWorkspace("examples", this._fileCache);
+        if (this.onSaveDocument)
+            this.onSaveDocument(this, newId, emptyTemplate);
+        this.loadFile(newId);
+    };
     IDE.prototype.injectSpans = function (packed, attributes) {
         this.editor.injectSpans(packed, attributes);
         this.comments.update();
@@ -2387,7 +2624,28 @@ var IDE = (function () {
     };
     IDE.prototype.injectNotice = function (type, message) {
         var time = Date.now();
-        this.notices.push({ type: type, message: message, time: time });
+        var existing;
+        for (var _i = 0, _a = this.notices; _i < _a.length; _i++) {
+            var notice = _a[_i];
+            if (notice.type === type && notice.message === message) {
+                existing = notice;
+                existing.time = time;
+                break;
+            }
+        }
+        if (!existing) {
+            existing = { type: type, message: message, time: time };
+            this.notices.push(existing);
+        }
+        this.render();
+        this.editor.cm.refresh();
+        return existing;
+    };
+    IDE.prototype.dismissNotice = function (notice) {
+        var ix = this.notices.indexOf(notice);
+        if (ix === -1)
+            return;
+        this.notices.splice(ix, 1);
         this.render();
         this.editor.cm.refresh();
     };
@@ -2490,7 +2748,7 @@ var IDE = (function () {
                 this.attachView(recordId, record.span[0]);
             }
             else if (record.node) {
-                client_1.send({ type: "findNode", recordId: recordId, node: record.node[0] });
+                client_1.client.send({ type: "findNode", recordId: recordId, node: record.node[0] });
             }
             else {
                 console.warn("Unable to parent view that doesn't provide its origin node  or span id", record);
@@ -2554,7 +2812,7 @@ var IDE = (function () {
     };
     IDE.prototype.toggleInspecting = function () {
         if (this.inspecting) {
-            client_1.sendEvent([{ tag: ["inspector", "clear"] }]);
+            client_1.client.sendEvent([{ tag: ["inspector", "clear"] }]);
         }
         else {
             this.inspectingClick = true;
@@ -2701,9 +2959,9 @@ var LanguageService = (function () {
         this._listeners[id] = callback;
         args.type = type;
         //console.log("SENT", args);
-        client_1.send(args);
+        client_1.client.send(args);
     };
-    LanguageService._requestId = 0;
     return LanguageService;
 }());
+LanguageService._requestId = 0;
 //# sourceMappingURL=ide.js.map
