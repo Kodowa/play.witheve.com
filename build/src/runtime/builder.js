@@ -1,7 +1,8 @@
+"use strict";
 //-----------------------------------------------------------
 // Builder
 //-----------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var join = require("./join");
 var providers = require("./providers/index");
 require("./providers/math");
@@ -305,6 +306,11 @@ function buildScans(block, context, scanLikes, outputScans) {
             if (!(entity || attribute || value || node)) {
                 context.errors.push(errors.blankScan(block, scanLike));
             }
+            else {
+                entity = entity || context.createVariable();
+                attribute = attribute || context.createVariable();
+                value = value || context.createVariable();
+            }
             var final = new join.Scan(scanLike.id + "|build", entity, attribute, value, node, scanLike.scopes);
             outputScans.push(final);
             scanLike.buildId = final.id;
@@ -439,14 +445,15 @@ function buildExpressions(block, context, expressions, outputScans) {
             }
             for (var _c = 0, _d = expression.record.attributes; _c < _d.length; _c++) {
                 var attribute = _d[_c];
-                var ix = impl.AttributeMapping[attribute.attribute];
-                if (ix !== undefined) {
+                var ix = void 0;
+                if (impl.AttributeMapping && (ix = impl.AttributeMapping[attribute.attribute]) !== undefined) {
                     args[ix] = context.getValue(attribute.value);
                 }
                 else if (impl.ReturnMapping && (ix = impl.ReturnMapping[attribute.attribute]) !== undefined) {
                     results[ix] = attribute.value;
                 }
                 else {
+                    context.errors.push(errors.unrecognisedFunctionAttribute(block, expression, attribute));
                 }
             }
             var resultIx = 0;
@@ -571,6 +578,7 @@ function buildActions(block, context, actions, scans) {
                     action.buildId = final.id;
                 }
             }
+            // throw new Error("Action actions aren't implemented yet.")
         }
         else {
             throw new Error("Not implemented: action " + action.type);
@@ -645,6 +653,8 @@ function stratify(scans) {
             }
         }
         else if (scan instanceof join.NotScan) {
+            // not can never provide a variable, so there's nothing
+            // we need to do here
         }
     }
     // Before we start to stratify, we need to run through all the aggregates

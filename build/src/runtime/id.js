@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var IdStore = (function () {
     function IdStore() {
         this.currentId = 0;

@@ -1,41 +1,23 @@
+"use strict";
 //---------------------------------------------------------------------
 // String providers
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var join_1 = require("../join");
 var providers = require("./index");
-// Concat strings together. Args expects a set of variables/string constants
-// to concatenate together and an array with a single return variable
-var Concat = (function (_super) {
-    __extends(Concat, _super);
-    function Concat() {
-        return _super.apply(this, arguments) || this;
-    }
-    // To resolve a proposal, we concatenate our resolved args
-    Concat.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [args.join("")];
-    };
-    // We accept a prefix if the return is equivalent to concatentating
-    // all the args
-    Concat.prototype.test = function (prefix) {
-        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
-        return args.join("") === returns[0];
-    };
-    // concat always returns cardinality 1
-    Concat.prototype.getProposal = function (tripleIndex, proposed, prefix) {
-        var proposal = this.proposalObject;
-        proposal.providing = proposed;
-        proposal.cardinality = 1;
-        return proposal;
-    };
-    return Concat;
-}(join_1.Constraint));
+//---------------------------------------------------------------------
+// Providers
+//---------------------------------------------------------------------
 var Split = (function (_super) {
     __extends(Split, _super);
     function Split(id, args, returns) {
@@ -111,7 +93,7 @@ Split.ReturnMapping = {
 var Substring = (function (_super) {
     __extends(Substring, _super);
     function Substring() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     // To resolve a proposal, we concatenate our resolved args
     Substring.prototype.resolveProposal = function (proposal, prefix) {
@@ -136,7 +118,6 @@ var Substring = (function (_super) {
             from = args[1] - 1;
         if (args[2] != undefined)
             to = args[2];
-        console.log("test string", text.substring(from, to), from, to, returns[0]);
         return text.substring(from, to) === returns[0];
     };
     // substring always returns cardinality 1
@@ -162,10 +143,91 @@ Substring.AttributeMapping = {
 Substring.ReturnMapping = {
     "value": 0,
 };
+var Find = (function (_super) {
+    __extends(Find, _super);
+    function Find(id, args, returns) {
+        var _this = _super.call(this, id, args, returns) || this;
+        if (_this.returns[1] !== undefined && _this.returns[0] !== undefined) {
+            _this.returnType = "both";
+        }
+        else if (_this.returns[0] !== undefined) {
+            _this.returnType = "position";
+        }
+        return _this;
+    }
+    Find.prototype.resolveProposal = function (proposal, prefix) {
+        return proposal.index;
+    };
+    Find.prototype.getIndexes = function (text, subtext, from, caseSensitive, withIx) {
+        var start = (from || 1) - 1;
+        var currentIndex;
+        var ixs = [];
+        var subLength = subtext.length;
+        if (!caseSensitive) {
+            text = text.toLowerCase();
+            subtext = subtext.toLowerCase();
+        }
+        if (withIx) {
+            while ((currentIndex = text.indexOf(subtext, start)) > -1) {
+                ixs.push([currentIndex + 1, ixs.length + 1]);
+                start = currentIndex + subLength;
+            }
+        }
+        else {
+            while ((currentIndex = text.indexOf(subtext, start)) > -1) {
+                ixs.push(currentIndex + 1);
+                start = currentIndex + subLength;
+            }
+        }
+        return ixs;
+    };
+    Find.prototype.test = function (prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        var text = args[Find.AttributeMapping["text"]];
+        var subtext = args[Find.AttributeMapping["subtext"]];
+        if (typeof text !== "string" || typeof subtext !== "string")
+            return false;
+        return text.indexOf(subtext, returns[0] - 1) === returns[0];
+    };
+    Find.prototype.getProposal = function (tripleIndex, proposed, prefix) {
+        var proposal = this.proposalObject;
+        var args = this.resolve(prefix).args;
+        var text = args[Find.AttributeMapping["text"]];
+        var subtext = args[Find.AttributeMapping["subtext"]];
+        var caseSensitive = args[Find.AttributeMapping["case-sensitive"]];
+        var from = args[Find.AttributeMapping["from"]];
+        if (typeof text !== "string" || typeof subtext !== "string") {
+            proposal.cardinality = 0;
+            return;
+        }
+        var both = this.returnType === "both";
+        var indexes = this.getIndexes(text, subtext, from, caseSensitive, both);
+        if (both) {
+            proposal.providing = [this.returns[0], this.returns[1]];
+        }
+        else {
+            proposal.providing = this.returns[0];
+        }
+        proposal.cardinality = indexes.length;
+        proposal.index = indexes;
+        return proposal;
+    };
+    return Find;
+}(join_1.Constraint));
+Find.AttributeMapping = {
+    "text": 0,
+    "subtext": 1,
+    "case-sensitive": 2,
+    "from": 3,
+};
+Find.ReturnMapping = {
+    "string-position": 0,
+    "result-index": 0,
+};
 var Convert = (function (_super) {
     __extends(Convert, _super);
     function Convert() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Convert.prototype.resolveProposal = function (proposal, prefix) {
         var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
@@ -236,7 +298,7 @@ Convert.ReturnMapping = {
 var Urlencode = (function (_super) {
     __extends(Urlencode, _super);
     function Urlencode() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     // To resolve a proposal, we urlencode a text
     Urlencode.prototype.resolveProposal = function (proposal, prefix) {
@@ -269,9 +331,127 @@ Urlencode.AttributeMapping = {
 Urlencode.ReturnMapping = {
     "value": 0,
 };
-providers.provide("concat", Concat);
+var Length = (function (_super) {
+    __extends(Length, _super);
+    function Length() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    Length.prototype.validAsOption = function (az) {
+        if (az === undefined || az === "symbols" || az === "code-points") {
+            return true;
+        }
+        else {
+            return false;
+        }
+    };
+    Length.prototype.getLength = function (text, az) {
+        if (az === "symbols") {
+            return [this.countSymbols(text)];
+        }
+        else if (az === "code-points") {
+            return [text.length];
+        }
+        return undefined;
+    };
+    Length.prototype.resolveProposal = function (proposal, prefix) {
+        var args = this.resolve(prefix).args;
+        var text = args[0], az = args[1];
+        if (az === undefined) {
+            az = "symbols";
+        }
+        return this.getLength(text, az);
+    };
+    Length.prototype.test = function (prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        var text = args[0], az = args[1];
+        if (!this.validAsOption(az))
+            return false;
+        if (typeof text !== "string")
+            return false;
+        return this.getLength(text, az) === returns[0];
+    };
+    Length.prototype.getProposal = function (tripleIndex, proposed, prefix) {
+        var proposal = this.proposalObject;
+        var args = this.resolve(prefix).args;
+        var text = args[0], az = args[1];
+        if (typeof args[0] !== "string") {
+            proposal.cardinality = 0;
+        }
+        else if (!this.validAsOption(az)) {
+            proposal.cardinality = 0;
+        }
+        else {
+            proposal.providing = proposed;
+            proposal.cardinality = 1;
+        }
+        return proposal;
+    };
+    // Adapted from: https://mathiasbynens.be/notes/javascript-unicode
+    Length.prototype.countSymbols = function (string) {
+        var index;
+        var symbolCount = 0;
+        for (index = 0; index < string.length - 1; ++index) {
+            var charCode = string.charCodeAt(index);
+            if (charCode >= 0xD800 && charCode <= 0xDBFF) {
+                charCode = string.charCodeAt(index + 1);
+                if (charCode >= 0xDC00 && charCode <= 0xDFFF) {
+                    index++;
+                    symbolCount++;
+                    continue;
+                }
+            }
+            symbolCount++;
+        }
+        if (string.charAt(index) !== "") {
+            symbolCount++;
+        }
+        return symbolCount;
+    };
+    return Length;
+}(join_1.Constraint));
+Length.AttributeMapping = {
+    "text": 0,
+    "as": 1,
+};
+//---------------------------------------------------------------------
+// Internal providers
+//---------------------------------------------------------------------
+// InternalConcat is used for the implementation of string embedding, e.g.
+// "foo {{name}}". Args expects a set of variables/string constants
+// to concatenate together and an array with a single return variable
+var InternalConcat = (function (_super) {
+    __extends(InternalConcat, _super);
+    function InternalConcat() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    // To resolve a proposal, we concatenate our resolved args
+    InternalConcat.prototype.resolveProposal = function (proposal, prefix) {
+        var args = this.resolve(prefix).args;
+        return [args.join("")];
+    };
+    // We accept a prefix if the return is equivalent to concatentating
+    // all the args
+    InternalConcat.prototype.test = function (prefix) {
+        var _a = this.resolve(prefix), args = _a.args, returns = _a.returns;
+        return args.join("") === returns[0];
+    };
+    // concat always returns cardinality 1
+    InternalConcat.prototype.getProposal = function (tripleIndex, proposed, prefix) {
+        var proposal = this.proposalObject;
+        proposal.providing = proposed;
+        proposal.cardinality = 1;
+        return proposal;
+    };
+    return InternalConcat;
+}(join_1.Constraint));
+//---------------------------------------------------------------------
+// Mappings
+//---------------------------------------------------------------------
 providers.provide("split", Split);
 providers.provide("substring", Substring);
 providers.provide("convert", Convert);
 providers.provide("urlencode", Urlencode);
+providers.provide("length", Length);
+providers.provide("find", Find);
+providers.provide("eve-internal/concat", InternalConcat);
 //# sourceMappingURL=string.js.map

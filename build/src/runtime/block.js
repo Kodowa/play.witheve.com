@@ -1,7 +1,8 @@
+"use strict";
 //---------------------------------------------------------------------
 // Block
 //---------------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var join_1 = require("./join");
 var changes_1 = require("./changes");
 var actions_1 = require("./actions");

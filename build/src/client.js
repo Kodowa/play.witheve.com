@@ -1,9 +1,9 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("./util");
 var config_1 = require("./config");
 var renderer_1 = require("./renderer");
 var ide_1 = require("./ide");
-var browser = require("./runtime/browser");
 var db_1 = require("./db");
 function analyticsEvent(kind, label, value) {
     var ga = window["ga"];
@@ -170,7 +170,7 @@ var EveClient = (function () {
             this.socketSend(message);
         }
         else {
-            browser.responder.handleEvent(message);
+            this.worker.postMessage(message);
         }
     };
     EveClient.prototype.sendControl = function (message) {
@@ -178,6 +178,13 @@ var EveClient = (function () {
             this.socketSend(message);
         }
         else {
+            // @TODO where do local control messages go?
+        }
+    };
+    EveClient.prototype.save = function (documentId, code) {
+        this.sendControl(JSON.stringify({ type: "save", path: documentId, code: code }));
+        if (this.worker) {
+            this.worker.postMessage(JSON.stringify({ type: "save", path: documentId, code: code }));
         }
     };
     EveClient.prototype.sendEvent = function (records) {
@@ -207,7 +214,9 @@ var EveClient = (function () {
         this.localControl = true;
         this.localEve = true;
         if (!this.ide) {
-            this._initProgram({ runtimeOwner: config_1.Owner.client, controlOwner: config_1.Owner.client, withIDE: true, path: (window.location.hash || "").slice(1) || "/examples/quickstart.eve" });
+            var path_1 = (window.location.hash || "").slice(1) || "/examples/quickstart.eve";
+            ;
+            this._initProgram({ config: { runtimeOwner: config_1.Owner.client, controlOwner: config_1.Owner.client, editor: true, path: path_1 }, path: (window.location.hash || "").slice(1) || "/examples/quickstart.eve", code: "", workspaces: window["_workspaceCache"] });
         }
         else {
             this.injectNotice("error", "Unexpectedly disconnected from the server. Please refresh the page.");
@@ -270,34 +279,44 @@ var EveClient = (function () {
         }
     };
     EveClient.prototype._initProgram = function (data) {
-        this.localEve = data.runtimeOwner === config_1.Owner.client;
-        this.localControl = data.controlOwner === config_1.Owner.client;
-        this.showIDE = data.withIDE;
+        var _this = this;
+        config_1.init(data.config);
+        this.localEve = config_1.config.runtimeOwner === config_1.Owner.client;
+        this.localControl = config_1.config.controlOwner === config_1.Owner.client;
+        this.showIDE = config_1.config.editor;
         if (this.localEve) {
-            browser.init(data.code);
+            this.worker = new Worker("/build/src/loadWorker.js");
+            this.worker.onmessage = function (event) {
+                _this.onMessage(event);
+            };
+            this.send({ type: "init", code: data.code, showIDE: data.config.editor, workspaces: data.workspaces, config: config_1.config, workspaceCache: window["_workspaceCache"] });
         }
         if (this.showIDE) {
-            var path_1 = data.path;
-            if (path_1 === undefined)
-                path_1 = location.hash && location.hash.slice(1);
+            var path_2 = data.path;
+            if (path_2 === undefined)
+                path_2 = location.hash && location.hash.slice(1);
             //history.replaceState({}, "", window.location.pathname);
             this.ide = new ide_1.IDE();
             this.ide.local = this.localControl;
             initIDE(this);
             this.ide.render();
             var found = false;
-            if (path_1 && path_1.length > 2) {
-                var currentHashChunks = path_1.split("#"); //.slice(1);
+            if (path_2 && path_2.length > 2) {
+                var currentHashChunks = path_2.split("#"); //.slice(1);
                 var docId = currentHashChunks[0];
                 if (docId && docId[docId.length - 1] === "/")
                     docId = docId.slice(0, -1);
                 found = this.ide.loadFile(docId, data.code);
             }
-            if (!found && data.internal) {
+            if (!found && config_1.config.internal) {
                 this.ide.loadFile("/examples/quickstart.eve");
             }
         }
         onHashChange({});
+    };
+    EveClient.prototype._css = function (data) {
+        var appIframe = document.getElementById('app-preview-iframe');
+        appIframe.contentWindow.document.getElementById("app-styles").innerHTML = data.css;
     };
     EveClient.prototype._parse = function (data) {
         if (!this.showIDE)
@@ -424,15 +443,15 @@ function initIDE(client) {
         console.groupCollapsed("SENT " + generation);
         console.info(md);
         console.groupEnd();
-        client.send({ scope: "root", type: "parse", generation: generation, code: md });
+        client.send({ scope: "root", type: "parse", generation: generation, code: md, documentId: ide.documentId });
     };
     ide.onEval = function (ide, persist) {
-        client.send({ type: "eval", persist: persist });
+        client.send({ type: "eval", persist: persist, documentId: ide.documentId });
     };
     ide.onLoadFile = function (ide, documentId, code) {
         client.send({ type: "close" });
-        client.send({ scope: "root", type: "parse", code: code });
-        client.send({ type: "eval", persist: false });
+        client.send({ scope: "root", type: "parse", code: code, documentId: ide.documentId });
+        client.send({ type: "eval", persist: false, documentId: ide.documentId });
         var url = location.pathname + "#" + documentId;
         var currentHashChunks = location.hash.split("#").slice(1);
         var curId = currentHashChunks[0];
@@ -445,7 +464,7 @@ function initIDE(client) {
         analyticsEvent("load-document", documentId);
     };
     ide.onSaveDocument = function (ide, documentId, code) {
-        client.sendControl(JSON.stringify({ type: "save", path: documentId, code: code }));
+        client.save(documentId, code);
     };
     ide.onTokenInfo = function (ide, tokenId) {
         client.send({ type: "tokenInfo", tokenId: tokenId });

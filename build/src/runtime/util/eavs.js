@@ -1,7 +1,8 @@
+"use strict";
 //---------------------------------------------------------------------
 // Utility functions for working with triples
 //---------------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var JSON_NULL_ID = "external|json|null";
 //---------------------------------------------------------------------
 // JS conversion

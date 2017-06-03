@@ -1,12 +1,18 @@
+"use strict";
 //-----------------------------------------------------------
 // Parser
 //-----------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var commonmark = require("commonmark");
 var chev = require("chevrotain");
 var errors_1 = require("./errors");
@@ -119,7 +125,7 @@ var breakChars = "@#\\.,\\(\\)\\[\\]\\{\\}⦑⦒:\\\"";
 var DocContent = (function (_super) {
     __extends(DocContent, _super);
     function DocContent() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return DocContent;
 }(Token));
@@ -128,7 +134,7 @@ exports.DocContent = DocContent;
 var Fence = (function (_super) {
     __extends(Fence, _super);
     function Fence() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return Fence;
 }(Token));
@@ -138,7 +144,7 @@ exports.Fence = Fence;
 var CloseFence = (function (_super) {
     __extends(CloseFence, _super);
     function CloseFence() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return CloseFence;
 }(Token));
@@ -149,7 +155,7 @@ exports.CloseFence = CloseFence;
 var CommentLine = (function (_super) {
     __extends(CommentLine, _super);
     function CommentLine() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "comment";
         return _this;
     }
@@ -162,7 +168,7 @@ exports.CommentLine = CommentLine;
 var Equality = (function (_super) {
     __extends(Equality, _super);
     function Equality() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "equality";
         return _this;
     }
@@ -173,7 +179,7 @@ exports.Equality = Equality;
 var Comparison = (function (_super) {
     __extends(Comparison, _super);
     function Comparison() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "comparison";
         return _this;
     }
@@ -184,7 +190,7 @@ exports.Comparison = Comparison;
 var AddInfix = (function (_super) {
     __extends(AddInfix, _super);
     function AddInfix() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "infix";
         return _this;
     }
@@ -195,7 +201,7 @@ exports.AddInfix = AddInfix;
 var MultInfix = (function (_super) {
     __extends(MultInfix, _super);
     function MultInfix() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "infix";
         return _this;
     }
@@ -206,7 +212,7 @@ exports.MultInfix = MultInfix;
 var Merge = (function (_super) {
     __extends(Merge, _super);
     function Merge() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "merge";
         return _this;
     }
@@ -217,7 +223,7 @@ exports.Merge = Merge;
 var Set = (function (_super) {
     __extends(Set, _super);
     function Set() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "set";
         return _this;
     }
@@ -228,7 +234,7 @@ exports.Set = Set;
 var Mutate = (function (_super) {
     __extends(Mutate, _super);
     function Mutate() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "mutate";
         return _this;
     }
@@ -239,7 +245,7 @@ exports.Mutate = Mutate;
 var Dot = (function (_super) {
     __extends(Dot, _super);
     function Dot() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "dot";
         return _this;
     }
@@ -250,7 +256,7 @@ exports.Dot = Dot;
 var Pipe = (function (_super) {
     __extends(Pipe, _super);
     function Pipe() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "pipe";
         return _this;
     }
@@ -262,7 +268,7 @@ exports.Pipe = Pipe;
 var Identifier = (function (_super) {
     __extends(Identifier, _super);
     function Identifier() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "identifier";
         return _this;
     }
@@ -273,7 +279,7 @@ exports.Identifier = Identifier;
 var FunctionIdentifier = (function (_super) {
     __extends(FunctionIdentifier, _super);
     function FunctionIdentifier() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "functionIdentifier";
         return _this;
     }
@@ -285,7 +291,7 @@ exports.FunctionIdentifier = FunctionIdentifier;
 var Keyword = (function (_super) {
     __extends(Keyword, _super);
     function Keyword() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return Keyword;
 }(Token));
@@ -295,7 +301,7 @@ exports.Keyword = Keyword;
 var Lookup = (function (_super) {
     __extends(Lookup, _super);
     function Lookup() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "lookup";
         return _this;
     }
@@ -306,7 +312,7 @@ exports.Lookup = Lookup;
 var Action = (function (_super) {
     __extends(Action, _super);
     function Action() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "action";
         return _this;
     }
@@ -317,7 +323,7 @@ exports.Action = Action;
 var Search = (function (_super) {
     __extends(Search, _super);
     function Search() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "search";
         return _this;
     }
@@ -328,7 +334,7 @@ exports.Search = Search;
 var Is = (function (_super) {
     __extends(Is, _super);
     function Is() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "is";
         return _this;
     }
@@ -339,7 +345,7 @@ exports.Is = Is;
 var If = (function (_super) {
     __extends(If, _super);
     function If() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "if";
         return _this;
     }
@@ -350,7 +356,7 @@ exports.If = If;
 var Else = (function (_super) {
     __extends(Else, _super);
     function Else() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "else";
         return _this;
     }
@@ -361,7 +367,7 @@ exports.Else = Else;
 var Then = (function (_super) {
     __extends(Then, _super);
     function Then() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "then";
         return _this;
     }
@@ -372,7 +378,7 @@ exports.Then = Then;
 var Not = (function (_super) {
     __extends(Not, _super);
     function Not() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "not";
         return _this;
     }
@@ -384,7 +390,7 @@ exports.Not = Not;
 var Bool = (function (_super) {
     __extends(Bool, _super);
     function Bool() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "bool";
         return _this;
     }
@@ -395,7 +401,7 @@ exports.Bool = Bool;
 var Num = (function (_super) {
     __extends(Num, _super);
     function Num() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "num";
         return _this;
     }
@@ -406,7 +412,7 @@ exports.Num = Num;
 var None = (function (_super) {
     __extends(None, _super);
     function None() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "none";
         return _this;
     }
@@ -417,7 +423,7 @@ exports.None = None;
 var Name = (function (_super) {
     __extends(Name, _super);
     function Name() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "name";
         return _this;
     }
@@ -428,7 +434,7 @@ exports.Name = Name;
 var Tag = (function (_super) {
     __extends(Tag, _super);
     function Tag() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "tag";
         return _this;
     }
@@ -439,7 +445,7 @@ exports.Tag = Tag;
 var Uuid = (function (_super) {
     __extends(Uuid, _super);
     function Uuid() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "uuid";
         return _this;
     }
@@ -451,7 +457,7 @@ exports.Uuid = Uuid;
 var OpenBracket = (function (_super) {
     __extends(OpenBracket, _super);
     function OpenBracket() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "open-bracket";
         return _this;
     }
@@ -462,7 +468,7 @@ exports.OpenBracket = OpenBracket;
 var CloseBracket = (function (_super) {
     __extends(CloseBracket, _super);
     function CloseBracket() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "close-bracket";
         return _this;
     }
@@ -473,7 +479,7 @@ exports.CloseBracket = CloseBracket;
 var OpenParen = (function (_super) {
     __extends(OpenParen, _super);
     function OpenParen() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "open-paren";
         return _this;
     }
@@ -484,7 +490,7 @@ exports.OpenParen = OpenParen;
 var CloseParen = (function (_super) {
     __extends(CloseParen, _super);
     function CloseParen() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "close-paren";
         return _this;
     }
@@ -496,7 +502,7 @@ exports.CloseParen = CloseParen;
 var StringChars = (function (_super) {
     __extends(StringChars, _super);
     function StringChars() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "string";
         return _this;
     }
@@ -507,7 +513,7 @@ exports.StringChars = StringChars;
 var OpenString = (function (_super) {
     __extends(OpenString, _super);
     function OpenString() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "quote";
         return _this;
     }
@@ -519,7 +525,7 @@ exports.OpenString = OpenString;
 var CloseString = (function (_super) {
     __extends(CloseString, _super);
     function CloseString() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "quote";
         return _this;
     }
@@ -532,7 +538,7 @@ exports.CloseString = CloseString;
 var StringEmbedOpen = (function (_super) {
     __extends(StringEmbedOpen, _super);
     function StringEmbedOpen() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "string-embed-open";
         return _this;
     }
@@ -544,7 +550,7 @@ exports.StringEmbedOpen = StringEmbedOpen;
 var StringEmbedClose = (function (_super) {
     __extends(StringEmbedClose, _super);
     function StringEmbedClose() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.label = "string-embed-close";
         return _this;
     }
@@ -557,7 +563,7 @@ exports.StringEmbedClose = StringEmbedClose;
 var WhiteSpace = (function (_super) {
     __extends(WhiteSpace, _super);
     function WhiteSpace() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return WhiteSpace;
 }(Token));
@@ -671,9 +677,6 @@ var Parser = (function (_super) {
     function Parser(input) {
         var _this = _super.call(this, input, allTokens, {}) || this;
         var self = _this;
-        var rule = function (name, func) {
-            self[name] = self.RULE(name, func);
-        };
         var asValue = function (node) {
             if (node.type === "constant" || node.type === "variable" || node.type === "parenthesis") {
                 return node;
@@ -721,7 +724,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Doc rules
         //-----------------------------------------------------------
-        rule("doc", function () {
+        self.RULE("doc", function () {
             var doc = {
                 full: [],
                 content: [],
@@ -749,7 +752,7 @@ var Parser = (function (_super) {
             });
             return doc;
         });
-        rule("fencedBlock", function () {
+        self.RULE("fencedBlock", function () {
             self.CONSUME(Fence);
             var block = self.SUBRULE(self.codeBlock);
             var fence = self.CONSUME(CloseFence);
@@ -758,14 +761,14 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Blocks
         //-----------------------------------------------------------
-        rule("codeBlock", function (blockId) {
+        self.RULE("codeBlock", function (blockId) {
             if (blockId === void 0) { blockId = "block"; }
             blockStack = [];
             var block = pushBlock(blockId);
             self.MANY(function () { self.SUBRULE(self.section); });
             return popBlock();
         });
-        rule("section", function () {
+        self.RULE("section", function () {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.searchSection); } },
                 { ALT: function () { return self.SUBRULE(self.actionSection); } },
@@ -775,7 +778,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Scope declaration
         //-----------------------------------------------------------
-        rule("scopeDeclaration", function () {
+        self.RULE("scopeDeclaration", function () {
             var scopes = [];
             self.OR([
                 { ALT: function () {
@@ -798,7 +801,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Search section
         //-----------------------------------------------------------
-        rule("searchSection", function () {
+        self.RULE("searchSection", function () {
             // @TODO fill in from
             var from = [];
             self.CONSUME(Search);
@@ -817,7 +820,7 @@ var Parser = (function (_super) {
             });
             return makeNode("searchSection", { statements: statements, scopes: scopes, from: from });
         });
-        rule("statement", function () {
+        self.RULE("statement", function () {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.comparison); } },
                 { ALT: function () { return self.SUBRULE(self.notStatement); } },
@@ -826,7 +829,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Action section
         //-----------------------------------------------------------
-        rule("actionSection", function () {
+        self.RULE("actionSection", function () {
             // @TODO fill in from
             var from = [];
             var action = self.CONSUME(Action).image;
@@ -845,7 +848,7 @@ var Parser = (function (_super) {
             });
             return makeNode("actionSection", { statements: statements, scopes: scopes, from: from });
         });
-        rule("actionStatement", function (actionKey) {
+        self.RULE("actionStatement", function (actionKey) {
             return self.OR([
                 { ALT: function () {
                         var record = self.SUBRULE(self.record, [false, actionKey, "+="]);
@@ -863,13 +866,13 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Action operations
         //-----------------------------------------------------------
-        rule("actionOperation", function (actionKey) {
+        self.RULE("actionOperation", function (actionKey) {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.recordOperation, [actionKey]); } },
                 { ALT: function () { return self.SUBRULE(self.attributeOperation, [actionKey]); } },
             ]);
         });
-        rule("attributeOperation", function (actionKey) {
+        self.RULE("attributeOperation", function (actionKey) {
             var mutator = self.SUBRULE(self.attributeMutator);
             var attribute = mutator.attribute, parent = mutator.parent;
             return self.OR([
@@ -926,7 +929,7 @@ var Parser = (function (_super) {
                     } },
             ]);
         });
-        rule("recordOperation", function (actionKey) {
+        self.RULE("recordOperation", function (actionKey) {
             var variable = self.SUBRULE(self.variable);
             return self.OR([
                 { ALT: function () {
@@ -948,7 +951,7 @@ var Parser = (function (_super) {
                     } },
             ]);
         });
-        rule("actionLookup", function (actionKey) {
+        self.RULE("actionLookup", function (actionKey) {
             var lookup = self.CONSUME(Lookup);
             var record = self.SUBRULE(self.record, [true]);
             var info = {};
@@ -971,13 +974,13 @@ var Parser = (function (_super) {
             self.block[actionKey](action);
             return action;
         });
-        rule("actionAttributeExpression", function (actionKey, action, parent) {
+        self.RULE("actionAttributeExpression", function (actionKey, action, parent) {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.record, [false, actionKey, action, parent]); } },
                 { ALT: function () { return self.SUBRULE(self.infix); } },
             ]);
         });
-        rule("actionEqualityRecord", function (actionKey) {
+        self.RULE("actionEqualityRecord", function (actionKey) {
             var variable = self.SUBRULE(self.variable);
             self.CONSUME(Equality);
             var record = self.SUBRULE(self.record, [true, actionKey, "+="]);
@@ -988,7 +991,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Record + attribute
         //-----------------------------------------------------------
-        rule("record", function (noVar, blockKey, action, parent, passedVariable) {
+        self.RULE("record", function (noVar, blockKey, action, parent, passedVariable) {
             if (noVar === void 0) { noVar = false; }
             if (blockKey === void 0) { blockKey = "scan"; }
             if (action === void 0) { action = false; }
@@ -1046,7 +1049,7 @@ var Parser = (function (_super) {
             }
             return record;
         });
-        rule("attribute", function (noVar, blockKey, action, recordVariable) {
+        self.RULE("attribute", function (noVar, blockKey, action, recordVariable) {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.attributeEquality, [noVar, blockKey, action, recordVariable]); } },
                 { ALT: function () { return self.SUBRULE(self.attributeComparison); } },
@@ -1054,7 +1057,7 @@ var Parser = (function (_super) {
                 { ALT: function () { return self.SUBRULE(self.singularAttribute); } },
             ]);
         });
-        rule("singularAttribute", function (forceGenerate) {
+        self.RULE("singularAttribute", function (forceGenerate) {
             return self.OR([
                 { ALT: function () {
                         var tag = self.SUBRULE(self.tag);
@@ -1066,7 +1069,7 @@ var Parser = (function (_super) {
                     } },
             ]);
         });
-        rule("attributeMutator", function () {
+        self.RULE("attributeMutator", function () {
             var scans = [];
             var entity, attribute, value;
             var needsEntity = true;
@@ -1093,7 +1096,7 @@ var Parser = (function (_super) {
             from.push(attribute);
             return makeNode("attributeMutator", { attribute: attribute, parent: entity, from: from });
         });
-        rule("attributeAccess", function () {
+        self.RULE("attributeAccess", function () {
             var scans = [];
             var entity, attribute, value;
             var needsEntity = true;
@@ -1116,7 +1119,7 @@ var Parser = (function (_super) {
             });
             return value;
         });
-        rule("attributeEquality", function (noVar, blockKey, action, parent) {
+        self.RULE("attributeEquality", function (noVar, blockKey, action, parent) {
             var attributes = [];
             var autoIndex = 1;
             var attributeNode;
@@ -1178,7 +1181,7 @@ var Parser = (function (_super) {
             attributes.push(makeNode("attribute", { attribute: attribute, value: asValue(result), from: [attributeNode, equality, result] }));
             return attributes;
         });
-        rule("attributeComparison", function () {
+        self.RULE("attributeComparison", function () {
             var attribute = self.CONSUME(Identifier);
             var comparator = self.CONSUME(Comparison);
             var result = self.SUBRULE(self.expression);
@@ -1188,7 +1191,7 @@ var Parser = (function (_super) {
             self.block.expression(expression);
             return makeNode("attribute", { attribute: attribute.image, value: variable, from: [attribute, comparator, expression] });
         });
-        rule("attributeNot", function (recordVariable) {
+        self.RULE("attributeNot", function (recordVariable) {
             var block = pushBlock();
             block.type = "not";
             var not = self.CONSUME(Not);
@@ -1212,12 +1215,12 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Name and tag
         //-----------------------------------------------------------
-        rule("name", function () {
+        self.RULE("name", function () {
             var at = self.CONSUME(Name);
             var name = self.CONSUME(Identifier);
             return makeNode("name", { name: name.image, from: [at, name] });
         });
-        rule("tag", function () {
+        self.RULE("tag", function () {
             var hash = self.CONSUME(Tag);
             var tag = self.CONSUME(Identifier);
             return makeNode("tag", { tag: tag.image, from: [hash, tag] });
@@ -1225,7 +1228,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Function
         //-----------------------------------------------------------
-        rule("functionRecord", function () {
+        self.RULE("functionRecord", function () {
             var name = self.OR([
                 { ALT: function () { return self.CONSUME(FunctionIdentifier); } },
                 { ALT: function () { return self.CONSUME(Lookup); } }
@@ -1252,7 +1255,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Comparison
         //-----------------------------------------------------------
-        rule("comparison", function (nonFiltering) {
+        self.RULE("comparison", function (nonFiltering) {
             var left = self.SUBRULE(self.expression);
             var from = [left];
             var rights = [];
@@ -1316,7 +1319,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Special Forms
         //-----------------------------------------------------------
-        rule("notStatement", function () {
+        self.RULE("notStatement", function () {
             var block = pushBlock();
             block.type = "not";
             var from = [
@@ -1334,7 +1337,7 @@ var Parser = (function (_super) {
             self.block.scan(block);
             return;
         });
-        rule("isExpression", function () {
+        self.RULE("isExpression", function () {
             var op = self.CONSUME(Is);
             var from = [
                 op,
@@ -1351,7 +1354,7 @@ var Parser = (function (_super) {
             });
             from.push(self.CONSUME(CloseParen));
             var variable = self.block.toVariable("is|" + op.startLine + "|" + op.startColumn, true);
-            var is = makeNode("expression", { variable: variable, op: "and", args: expressions, from: from });
+            var is = makeNode("expression", { variable: variable, op: "eve-internal/and", args: expressions, from: from });
             self.block.addUsage(variable, is);
             self.block.expression(is);
             return is;
@@ -1359,7 +1362,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // If ... then
         //-----------------------------------------------------------
-        rule("ifExpression", function () {
+        self.RULE("ifExpression", function () {
             var branches = [];
             var from = branches;
             branches.push(self.SUBRULE(self.ifBranch));
@@ -1374,7 +1377,7 @@ var Parser = (function (_super) {
             });
             return makeNode("ifExpression", { branches: branches, from: from });
         });
-        rule("ifBranch", function () {
+        self.RULE("ifBranch", function () {
             var block = pushBlock();
             var from = [
                 self.CONSUME(If)
@@ -1393,7 +1396,7 @@ var Parser = (function (_super) {
             popBlock();
             return makeNode("ifBranch", { block: block, outputs: ifOutputs(expression), exclusive: false, from: from });
         });
-        rule("elseIfBranch", function () {
+        self.RULE("elseIfBranch", function () {
             var block = pushBlock();
             var from = [
                 self.CONSUME(Else),
@@ -1413,7 +1416,7 @@ var Parser = (function (_super) {
             popBlock();
             return makeNode("ifBranch", { block: block, outputs: ifOutputs(expression), exclusive: true, from: from });
         });
-        rule("elseBranch", function () {
+        self.RULE("elseBranch", function () {
             var block = pushBlock();
             var from = [self.CONSUME(Else)];
             var expression = self.SUBRULE(self.expression);
@@ -1426,10 +1429,10 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Infix and operator precedence
         //-----------------------------------------------------------
-        rule("infix", function () {
+        self.RULE("infix", function () {
             return self.SUBRULE(self.addition);
         });
-        rule("addition", function () {
+        self.RULE("addition", function () {
             var left = self.SUBRULE(self.multiplication);
             var from = [left];
             var ops = [];
@@ -1459,7 +1462,7 @@ var Parser = (function (_super) {
                 return makeNode("addition", { expressions: expressions, variable: curVar, from: from });
             }
         });
-        rule("multiplication", function () {
+        self.RULE("multiplication", function () {
             var left = self.SUBRULE(self.infixValue);
             var from = [left];
             var ops = [];
@@ -1489,7 +1492,7 @@ var Parser = (function (_super) {
                 return makeNode("multiplication", { expressions: expressions, variable: curVar, from: from });
             }
         });
-        rule("parenthesis", function () {
+        self.RULE("parenthesis", function () {
             var items = [];
             var from = [];
             from.push(self.CONSUME(OpenParen));
@@ -1504,7 +1507,7 @@ var Parser = (function (_super) {
             }
             return makeNode("parenthesis", { items: items, from: from });
         });
-        rule("infixValue", function () {
+        self.RULE("infixValue", function () {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.attributeAccess); } },
                 { ALT: function () { return self.SUBRULE(self.functionRecord); } },
@@ -1517,7 +1520,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Expression
         //-----------------------------------------------------------
-        rule("expression", function () {
+        self.RULE("expression", function () {
             var blockKey, action;
             if (self.currentAction !== "match") {
                 blockKey = self.currentAction;
@@ -1531,7 +1534,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Variable
         //-----------------------------------------------------------
-        rule("variable", function (forceGenerate) {
+        self.RULE("variable", function (forceGenerate) {
             if (forceGenerate === void 0) { forceGenerate = false; }
             var token = self.CONSUME(Identifier);
             var name = token.image;
@@ -1545,7 +1548,7 @@ var Parser = (function (_super) {
         //-----------------------------------------------------------
         // Values
         //-----------------------------------------------------------
-        rule("stringInterpolation", function () {
+        self.RULE("stringInterpolation", function () {
             var args = [];
             var start = self.CONSUME(OpenString);
             var from = [start];
@@ -1570,23 +1573,23 @@ var Parser = (function (_super) {
                 return args[0];
             }
             var variable = self.block.toVariable("concat|" + start.startLine + "|" + start.startColumn, true);
-            var expression = makeNode("expression", { op: "concat", args: args, variable: variable, from: from });
+            var expression = makeNode("expression", { op: "eve-internal/concat", args: args, variable: variable, from: from });
             self.block.addUsage(variable, expression);
             self.block.expression(expression);
             return expression;
         });
-        rule("value", function () {
+        self.RULE("value", function () {
             return self.OR([
                 { ALT: function () { return self.SUBRULE(self.stringInterpolation); } },
                 { ALT: function () { return self.SUBRULE(self.num); } },
                 { ALT: function () { return self.SUBRULE(self.bool); } },
             ]);
         });
-        rule("bool", function () {
+        self.RULE("bool", function () {
             var value = self.CONSUME(Bool);
             return makeNode("constant", { value: value.image === "true", from: [value] });
         });
-        rule("num", function () {
+        self.RULE("num", function () {
             var num = self.CONSUME(Num);
             return makeNode("constant", { value: parseFloat(num.image), from: [num] });
         });
@@ -1631,10 +1634,16 @@ function parseBlock(block, blockId, offset, spans, extraInfo) {
         spans.push(token.startOffset, token.startOffset + token.image.length, token.label, tokenId);
     }
     eveParser.input = lex.tokens;
-    // The parameters here are a strange quirk of how Chevrotain works, I believe the
-    // 1 tells chevrotain what level the rule is starting at, we then pass our params
-    // to the codeBlock parser function as an array
-    var results = eveParser.codeBlock(1, [blockId]);
+    var results;
+    try {
+        // The parameters here are a strange quirk of how Chevrotain works, I believe the
+        // 1 tells chevrotain what level the rule is starting at, we then pass our params
+        // to the codeBlock parser function as an array
+        results = eveParser.codeBlock(1, [blockId]);
+    }
+    catch (e) {
+        console.error("The parser threw an error: " + e);
+    }
     if (results) {
         results.start = offset;
         results.startOffset = offset;
@@ -1698,7 +1707,7 @@ function parseDoc(doc, docId) {
             if (errors.length) {
                 allErrors.push(errors);
             }
-            else {
+            else if (results) {
                 results.endOffset = block.endOffset;
                 parsedBlocks.push(results);
             }

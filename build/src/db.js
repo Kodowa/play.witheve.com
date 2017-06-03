@@ -1,9 +1,15 @@
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var Index = (function () {
     function Index() {
         this.index = {};
@@ -44,7 +50,7 @@ var Index = (function () {
 var IndexList = (function (_super) {
     __extends(IndexList, _super);
     function IndexList() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     IndexList.prototype.insert = function (key, value) {
         if (!this.index[key] || this.index[key].indexOf(value) === -1) {
@@ -78,7 +84,7 @@ exports.IndexList = IndexList;
 var IndexScalar = (function (_super) {
     __extends(IndexScalar, _super);
     function IndexScalar() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     IndexScalar.prototype.insert = function (key, value) {
         if (this.index[key] === undefined) {

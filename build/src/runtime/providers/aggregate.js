@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Aggregate providers
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var join_1 = require("../join");
 var providers = require("./index");
 var Aggregate = (function (_super) {
@@ -117,7 +123,7 @@ exports.Aggregate = Aggregate;
 var Sum = (function (_super) {
     __extends(Sum, _super);
     function Sum() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Sum.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -134,7 +140,7 @@ exports.Sum = Sum;
 var Count = (function (_super) {
     __extends(Count, _super);
     function Count() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Count.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -151,7 +157,7 @@ exports.Count = Count;
 var Average = (function (_super) {
     __extends(Average, _super);
     function Average() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Average.prototype.adjustAggregate = function (group, value, projection) {
         if (group.count === undefined) {
@@ -172,7 +178,7 @@ exports.Average = Average;
 var Min = (function (_super) {
     __extends(Min, _super);
     function Min() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Min.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {
@@ -189,7 +195,7 @@ exports.Min = Min;
 var Max = (function (_super) {
     __extends(Max, _super);
     function Max() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Max.prototype.adjustAggregate = function (group, value, projection) {
         if (group.result === undefined) {

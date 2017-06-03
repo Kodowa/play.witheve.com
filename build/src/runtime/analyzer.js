@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Analyzer
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var parser_1 = require("./parser");
 var runtime_1 = require("./runtime");
 var parser = require("./parser");
@@ -206,6 +212,11 @@ var Analysis = (function () {
     };
     Analysis.prototype._actionAction = function (context, node) {
         if (node.action === "erase") {
+            // if(node.attribute === undefined) {
+            //   context.provide(node.scopes, "any", "");
+            // } else {
+            //   context.provide(node.scopes, "all", "");
+            // }
         }
         else {
             var attribute = typeof node.attribute === "string" ? node.attribute : context.value(node.attribute);

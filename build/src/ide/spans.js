@@ -1,9 +1,15 @@
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("../util");
 function formattingChange(span, change, action) {
     var editor = span.editor;
@@ -213,7 +219,7 @@ exports.Span = Span;
 var InlineSpan = (function (_super) {
     __extends(InlineSpan, _super);
     function InlineSpan() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this._spanStyle = "inline";
         return _this;
     }
@@ -286,7 +292,7 @@ exports.InlineSpan = InlineSpan;
 var LineSpan = (function (_super) {
     __extends(LineSpan, _super);
     function LineSpan() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this._spanStyle = "line";
         return _this;
     }
@@ -333,12 +339,15 @@ var LineSpan = (function (_super) {
         if (util_1.samePosition(loc.from, change.to) && isEmpty && change.origin === "+delete") {
             this.clear();
             change.cancel();
+            // If we're at the beginning of line and delete into a non-empty line we remove the span too.
         }
         else if (util_1.samePosition(loc.from, change.to) &&
             doc.getLine(change.from.line) !== "" &&
             change.origin === "+delete") {
             this.clear();
             change.cancel();
+            // Similarly, if we're at the beginning of an empty line and hit enter
+            // we mean to remove the formatting.
         }
         else if (util_1.samePosition(loc.from, change.from) && change.isNewlineChange() && isEmpty) {
             this.clear();
@@ -383,7 +392,7 @@ exports.LineSpan = LineSpan;
 var BlockSpan = (function (_super) {
     __extends(BlockSpan, _super);
     function BlockSpan() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this._spanStyle = "block";
         return _this;
     }
@@ -462,7 +471,7 @@ exports.BlockSpan = BlockSpan;
 var ListItemSpan = (function (_super) {
     __extends(ListItemSpan, _super);
     function ListItemSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ListItemSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -502,7 +511,7 @@ var ListItemSpan = (function (_super) {
 var HeadingSpan = (function (_super) {
     __extends(HeadingSpan, _super);
     function HeadingSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     HeadingSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -550,7 +559,7 @@ exports.HeadingSpan = HeadingSpan;
 var ElisionSpan = (function (_super) {
     __extends(ElisionSpan, _super);
     function ElisionSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ElisionSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -589,7 +598,7 @@ var ElisionSpan = (function (_super) {
 var CodeBlockSpan = (function (_super) {
     __extends(CodeBlockSpan, _super);
     function CodeBlockSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     CodeBlockSpan.prototype.syntax = function () {
         return this.source.info ? this.source.info.toLowerCase().split(" ")[0] : "eve";
@@ -725,7 +734,7 @@ exports.CodeBlockSpan = CodeBlockSpan;
 var WhitespaceSpan = (function (_super) {
     __extends(WhitespaceSpan, _super);
     function WhitespaceSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     WhitespaceSpan.prototype.normalize = function () {
         _super.prototype.normalize.call(this);
@@ -736,7 +745,7 @@ var WhitespaceSpan = (function (_super) {
 var BlockAnnotationSpan = (function (_super) {
     __extends(BlockAnnotationSpan, _super);
     function BlockAnnotationSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     BlockAnnotationSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -781,7 +790,7 @@ exports.BlockAnnotationSpan = BlockAnnotationSpan;
 var AnnotationSpan = (function (_super) {
     __extends(AnnotationSpan, _super);
     function AnnotationSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     AnnotationSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -826,7 +835,7 @@ exports.AnnotationSpan = AnnotationSpan;
 var ParserSpan = (function (_super) {
     __extends(ParserSpan, _super);
     function ParserSpan() {
-        var _this = _super.apply(this, arguments) || this;
+        var _this = _super !== null && _super.apply(this, arguments) || this;
         _this._editorControlled = false;
         _this._spanStyle = "inline";
         return _this;
@@ -839,7 +848,7 @@ exports.ParserSpan = ParserSpan;
 var DocumentCommentSpan = (function (_super) {
     __extends(DocumentCommentSpan, _super);
     function DocumentCommentSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     DocumentCommentSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -925,7 +934,7 @@ exports.DocumentCommentSpan = DocumentCommentSpan;
 var DocumentWidgetSpan = (function (_super) {
     __extends(DocumentWidgetSpan, _super);
     function DocumentWidgetSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     DocumentWidgetSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -1003,7 +1012,7 @@ exports.DocumentWidgetSpan = DocumentWidgetSpan;
 var BadgeSpan = (function (_super) {
     __extends(BadgeSpan, _super);
     function BadgeSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     BadgeSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }
@@ -1033,7 +1042,7 @@ var BadgeSpan = (function (_super) {
 var LinkSpan = (function (_super) {
     __extends(LinkSpan, _super);
     function LinkSpan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     LinkSpan.prototype.apply = function (from, to, origin) {
         if (origin === void 0) { origin = "+input"; }

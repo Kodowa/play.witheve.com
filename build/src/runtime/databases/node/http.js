@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Node HTTP Database
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var actions_1 = require("../../actions");
 var runtime_1 = require("../../runtime");
 var eavs = require("../../util/eavs");
@@ -14,7 +20,7 @@ var httpRequest = require("request");
 var HttpDatabase = (function (_super) {
     __extends(HttpDatabase, _super);
     function HttpDatabase() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     HttpDatabase.prototype.sendRequest = function (evaluation, requestId, request) {
         var _this = this;
@@ -37,16 +43,18 @@ var HttpDatabase = (function (_super) {
             options.body = request.body[0];
         }
         httpRequest(options, function (error, response, body) {
-            // console.log("GOT RESPONSE", response.statusCode);
-            // console.log(error);
-            // console.log(response);
-            // console.log(body);
+            if (error || !response) {
+                // @TODO: expose errors and other weirdness into Eve instead of just bailing here.
+                console.error(error || "ERROR: No response received from HTTP request");
+                return;
+            }
             var scope = "http";
             var responseId = requestId + "|response";
             var changes = evaluation.createChanges();
             changes.store(scope, requestId, "response", responseId, _this.id);
             changes.store(scope, responseId, "tag", "response", _this.id);
-            if (response.headers["content-type"].indexOf("application/json") > -1) {
+            var contentType = response.headers["content-type"];
+            if (contentType && contentType.indexOf("application/json") > -1) {
                 var id = eavs.fromJS(changes, JSON.parse(body), _this.id, scope, responseId + "|json");
                 changes.store(scope, responseId, "json", id, _this.id);
             }

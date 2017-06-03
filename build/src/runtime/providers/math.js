@@ -1,18 +1,24 @@
+"use strict";
 //---------------------------------------------------------------------
 // Math providers
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var join_1 = require("../join");
 var providers = require("./index");
 var TotalFunctionConstraint = (function (_super) {
     __extends(TotalFunctionConstraint, _super);
     function TotalFunctionConstraint() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     // Proposes the return value of the total function as the value for the
     // proposed variable.
@@ -41,7 +47,7 @@ var TotalFunctionConstraint = (function (_super) {
 var TrigConstraint = (function (_super) {
     __extends(TrigConstraint, _super);
     function TrigConstraint() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     TrigConstraint.prototype.resolveTrigAttributes = function (args) {
         var degrees = args[0];
@@ -61,7 +67,7 @@ TrigConstraint.AttributeMapping = {
 var ValueOnlyConstraint = (function (_super) {
     __extends(ValueOnlyConstraint, _super);
     function ValueOnlyConstraint() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     return ValueOnlyConstraint;
 }(TotalFunctionConstraint));
@@ -77,21 +83,22 @@ function degreesToRadians(degrees) {
 var Add = (function (_super) {
     __extends(Add, _super);
     function Add() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
-    Add.prototype.resolveProposal = function (proposal, prefix) {
-        var args = this.resolve(prefix).args;
-        return [this.getReturnValue(args)];
-    };
     Add.prototype.getReturnValue = function (args) {
-        return args[0] + args[1];
+        if ((typeof (args[0]) === "number") && (typeof (args[1]) === "number")) {
+            return args[0] + args[1];
+        }
+        else {
+            return NaN;
+        }
     };
     return Add;
 }(TotalFunctionConstraint));
 var Subtract = (function (_super) {
     __extends(Subtract, _super);
     function Subtract() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Subtract.prototype.getReturnValue = function (args) {
         return args[0] - args[1];
@@ -101,7 +108,7 @@ var Subtract = (function (_super) {
 var Multiply = (function (_super) {
     __extends(Multiply, _super);
     function Multiply() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Multiply.prototype.getReturnValue = function (args) {
         return args[0] * args[1];
@@ -111,7 +118,7 @@ var Multiply = (function (_super) {
 var Divide = (function (_super) {
     __extends(Divide, _super);
     function Divide() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Divide.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -134,7 +141,7 @@ var Divide = (function (_super) {
 var Sin = (function (_super) {
     __extends(Sin, _super);
     function Sin() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Sin.prototype.getReturnValue = function (args) {
         return Math.sin(this.resolveTrigAttributes(args));
@@ -144,7 +151,7 @@ var Sin = (function (_super) {
 var Cos = (function (_super) {
     __extends(Cos, _super);
     function Cos() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Cos.prototype.getReturnValue = function (args) {
         return Math.cos(this.resolveTrigAttributes(args));
@@ -154,7 +161,7 @@ var Cos = (function (_super) {
 var Tan = (function (_super) {
     __extends(Tan, _super);
     function Tan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Tan.prototype.getReturnValue = function (args) {
         return Math.tan(this.resolveTrigAttributes(args));
@@ -164,7 +171,7 @@ var Tan = (function (_super) {
 var ASin = (function (_super) {
     __extends(ASin, _super);
     function ASin() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ASin.prototype.getReturnValue = function (args) {
         return Math.asin(args[0]);
@@ -174,7 +181,7 @@ var ASin = (function (_super) {
 var ACos = (function (_super) {
     __extends(ACos, _super);
     function ACos() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ACos.prototype.getReturnValue = function (args) {
         return Math.acos(args[0]);
@@ -184,7 +191,7 @@ var ACos = (function (_super) {
 var ATan = (function (_super) {
     __extends(ATan, _super);
     function ATan() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ATan.prototype.getReturnValue = function (args) {
         return Math.atan(args[0]);
@@ -194,7 +201,7 @@ var ATan = (function (_super) {
 var ATan2 = (function (_super) {
     __extends(ATan2, _super);
     function ATan2() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ATan2.prototype.getReturnValue = function (args) {
         return (Math.atan2(args[0], args[1]));
@@ -209,7 +216,7 @@ ATan2.AttributeMapping = {
 var SinH = (function (_super) {
     __extends(SinH, _super);
     function SinH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SinH.prototype.sinh = function (x) {
         var y = Math.exp(x);
@@ -223,7 +230,7 @@ var SinH = (function (_super) {
 var CosH = (function (_super) {
     __extends(CosH, _super);
     function CosH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     CosH.prototype.cosh = function (x) {
         var y = Math.exp(x);
@@ -237,7 +244,7 @@ var CosH = (function (_super) {
 var TanH = (function (_super) {
     __extends(TanH, _super);
     function TanH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     TanH.prototype.tanh = function (x) {
         if (x === Infinity) {
@@ -260,7 +267,7 @@ var TanH = (function (_super) {
 var ASinH = (function (_super) {
     __extends(ASinH, _super);
     function ASinH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ASinH.prototype.asinh = function (x) {
         if (x === -Infinity) {
@@ -278,7 +285,7 @@ var ASinH = (function (_super) {
 var ACosH = (function (_super) {
     __extends(ACosH, _super);
     function ACosH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ACosH.prototype.acosh = function (x) {
         //How do we handle number outside of range in Eve? 
@@ -295,7 +302,7 @@ var ACosH = (function (_super) {
 var ATanH = (function (_super) {
     __extends(ATanH, _super);
     function ATanH() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ATanH.prototype.atanh = function (x) {
         //How do we handle number outside of range in Eve? 
@@ -312,7 +319,7 @@ var ATanH = (function (_super) {
 var Log = (function (_super) {
     __extends(Log, _super);
     function Log() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Log.prototype.getReturnValue = function (args) {
         var baselog = 1;
@@ -330,7 +337,7 @@ Log.AttributeMapping = {
 var Exp = (function (_super) {
     __extends(Exp, _super);
     function Exp() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Exp.prototype.getReturnValue = function (args) {
         return (Math.exp(args[0]));
@@ -340,7 +347,7 @@ var Exp = (function (_super) {
 var Pow = (function (_super) {
     __extends(Pow, _super);
     function Pow() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Pow.prototype.getReturnValue = function (args) {
         return Math.pow(args[0], args[1]);
@@ -354,7 +361,7 @@ Pow.AttributeMapping = {
 var Mod = (function (_super) {
     __extends(Mod, _super);
     function Mod() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Mod.prototype.getReturnValue = function (args) {
         return args[0] % args[1];
@@ -368,7 +375,7 @@ Mod.AttributeMapping = {
 var Abs = (function (_super) {
     __extends(Abs, _super);
     function Abs() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Abs.prototype.getReturnValue = function (args) {
         return Math.abs(args[0]);
@@ -378,7 +385,7 @@ var Abs = (function (_super) {
 var Floor = (function (_super) {
     __extends(Floor, _super);
     function Floor() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Floor.prototype.getReturnValue = function (args) {
         return Math.floor(args[0]);
@@ -388,7 +395,7 @@ var Floor = (function (_super) {
 var Ceiling = (function (_super) {
     __extends(Ceiling, _super);
     function Ceiling() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Ceiling.prototype.getReturnValue = function (args) {
         return Math.ceil(args[0]);
@@ -398,7 +405,7 @@ var Ceiling = (function (_super) {
 var Random = (function (_super) {
     __extends(Random, _super);
     function Random() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Random.prototype.getReturnValue = function (args) {
         var seed = args[0];
@@ -416,7 +423,7 @@ Random.cache = {};
 var Gaussian = (function (_super) {
     __extends(Gaussian, _super);
     function Gaussian() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Gaussian.prototype.getReturnValue = function (args) {
         var seed = args[0], sigma = args[1], mu = args[2];
@@ -439,14 +446,14 @@ var Gaussian = (function (_super) {
 }(TotalFunctionConstraint));
 Gaussian.AttributeMapping = {
     "seed": 0,
-    "σ": 1,
-    "μ": 2
+    "stdev": 1,
+    "mean": 2
 };
 Gaussian.cache = {};
 var Round = (function (_super) {
     __extends(Round, _super);
     function Round() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Round.prototype.getReturnValue = function (args) {
         return Math.round(args[0]);
@@ -456,7 +463,7 @@ var Round = (function (_super) {
 var Fix = (function (_super) {
     __extends(Fix, _super);
     function Fix() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Fix.prototype.getReturnValue = function (args) {
         var x = args[0];
@@ -467,7 +474,7 @@ var Fix = (function (_super) {
 var ToFixed = (function (_super) {
     __extends(ToFixed, _super);
     function ToFixed() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     ToFixed.prototype.getReturnValue = function (args) {
         return args[0].toFixed(args[1]);
@@ -481,7 +488,7 @@ ToFixed.AttributeMapping = {
 var Range = (function (_super) {
     __extends(Range, _super);
     function Range() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Range.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -537,7 +544,7 @@ Range.AttributeMapping = {
 var PI = (function (_super) {
     __extends(PI, _super);
     function PI() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     PI.prototype.getReturnValue = function (args) {
         return Math.PI;
@@ -547,7 +554,7 @@ var PI = (function (_super) {
 var E = (function (_super) {
     __extends(E, _super);
     function E() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     E.prototype.getReturnValue = function (args) {
         return Math.E;
@@ -557,7 +564,7 @@ var E = (function (_super) {
 var LN2 = (function (_super) {
     __extends(LN2, _super);
     function LN2() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     LN2.prototype.getReturnValue = function (args) {
         return Math.LN2;
@@ -567,7 +574,7 @@ var LN2 = (function (_super) {
 var LN10 = (function (_super) {
     __extends(LN10, _super);
     function LN10() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     LN10.prototype.getReturnValue = function (args) {
         return Math.LN10;
@@ -577,7 +584,7 @@ var LN10 = (function (_super) {
 var LOG2E = (function (_super) {
     __extends(LOG2E, _super);
     function LOG2E() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     LOG2E.prototype.getReturnValue = function (args) {
         return Math.LOG2E;
@@ -587,7 +594,7 @@ var LOG2E = (function (_super) {
 var LOG10E = (function (_super) {
     __extends(LOG10E, _super);
     function LOG10E() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     LOG10E.prototype.getReturnValue = function (args) {
         return Math.LOG10E;
@@ -597,7 +604,7 @@ var LOG10E = (function (_super) {
 var SQRT1_2 = (function (_super) {
     __extends(SQRT1_2, _super);
     function SQRT1_2() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SQRT1_2.prototype.getReturnValue = function (args) {
         return Math.SQRT1_2;
@@ -607,7 +614,7 @@ var SQRT1_2 = (function (_super) {
 var SQRT2 = (function (_super) {
     __extends(SQRT2, _super);
     function SQRT2() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SQRT2.prototype.getReturnValue = function (args) {
         return Math.SQRT2;

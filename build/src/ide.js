@@ -1,9 +1,15 @@
 "use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var microReact_1 = require("microReact");
 var commonmark_1 = require("commonmark");
 var CodeMirror = require("codemirror");
@@ -600,7 +606,7 @@ exports.ChangeCancellable = ChangeCancellable;
 var ChangeInverted = (function (_super) {
     __extends(ChangeInverted, _super);
     function ChangeInverted() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     Object.defineProperty(ChangeInverted.prototype, "text", {
         /** Lines of text that used to be between from and to, which is overwritten by this change. */
@@ -913,6 +919,7 @@ var Editor = (function () {
             }
             _this.changingSpans = undefined;
             _this.changing = false;
+            _this._md = undefined;
             _this.history.transitioning = false;
             _this.formatting = {};
             _this.queueUpdate();
@@ -936,9 +943,11 @@ var Editor = (function () {
                     else if ((span.isInline() || span.isBlock()) &&
                         (util_1.comparePositions(cursor, loc.from) < 0 || util_1.comparePositions(cursor, loc.to) > 0)) {
                         span.normalize();
+                        // If the span is a Line and our cursor is on a different line, we're clear to normalize.
                     }
                     else if (span.isLine() && cursor.line !== loc.from.line) {
                         span.normalize();
+                        // Otherwise the span remains denormalized.
                     }
                     else {
                         ix++;
@@ -1039,6 +1048,7 @@ var Editor = (function () {
         this.reloading = false;
         this.history.transitioning = false;
         this.dirty = false;
+        this._md = undefined;
     };
     // This is an update to an existing document, so we need to figure out what got added and removed.
     Editor.prototype.updateDocument = function (packed, attributes) {
@@ -1178,6 +1188,8 @@ var Editor = (function () {
         this.reloading = false;
     };
     Editor.prototype.toMarkdown = function () {
+        if (this._md)
+            return this._md;
         var cm = this.cm;
         var doc = cm.getDoc();
         var spans = this.getAllSpans();
@@ -1272,7 +1284,8 @@ var Editor = (function () {
         if (pos < fullText.length) {
             pieces.push(fullText.substring(pos));
         }
-        return pieces.join("");
+        this._md = pieces.join("");
+        return this._md;
     };
     Editor.prototype.refresh = function () {
         this.cm.refresh();
@@ -1464,9 +1477,11 @@ var Editor = (function () {
             if (util_1.samePosition(loc.from, from) && util_1.samePosition(loc.to, to)) {
                 span.clear();
                 formatted = true;
+                // If formatted range wholly encloses a span of the same type, clear it.
             }
             else if (util_1.whollyEnclosed(loc, selection)) {
                 span.clear();
+                // If the formatted range is wholly enclosed in a span of the same type, split the span around it.
             }
             else if (util_1.whollyEnclosed(selection, loc)) {
                 if (!util_1.samePosition(loc.from, from))
@@ -1475,10 +1490,12 @@ var Editor = (function () {
                     neue.push(this.markSpan(to, loc.to, source));
                 span.clear();
                 formatted = true;
+                // If the formatted range intersects the end of a span of the same type, clear the intersection.
             }
             else if (util_1.comparePositions(loc.to, from) > 0) {
                 neue.push(this.markSpan(loc.from, from, source));
                 span.clear();
+                // If the formatted range intersects the start of a span of the same type, clear the intersection.
             }
             else if (util_1.comparePositions(loc.from, to) < 0) {
                 neue.push(this.markSpan(to, loc.to, source));
@@ -1530,6 +1547,7 @@ var Editor = (function () {
                 if (from.line !== to.line && _this.findSpans(from, to, "code_block").length || _this.findSpansAt(from, "code_block").length)
                     return;
                 _this.formatSpan(from, to, source);
+                // Otherwise we want to change our current formatting state.
             }
             else {
                 var action = "add"; // By default, we just want our following changes to be bold
@@ -1584,6 +1602,7 @@ var Editor = (function () {
                 if (!spans.length) {
                     _this.formatSpan(cur, cur, source);
                     formatted = true;
+                    // Otherwise store the span. We may need to clear them if we intend to unformat the selection.
                 }
                 else {
                     existing.push.apply(existing, spans);
@@ -1626,6 +1645,7 @@ var Editor = (function () {
             // If the span already exists, we mean to clear it.
             if (exists) {
                 exists.clear();
+                // We're creating a new span.
             }
             else {
                 // Block formats are exclusive, so we clear intersecting spans of other types.
@@ -2476,8 +2496,10 @@ var IDE = (function () {
             this.comments.update();
         }
         else {
+            // Empty file
         }
-        document.getElementById("app-styles").innerHTML = css;
+        var appIframe = document.getElementById('app-preview-iframe');
+        appIframe.contentWindow.document.getElementById("app-styles").innerHTML = css;
         document.getElementsByClassName("CodeMirror")[0].classList.remove("cm-s-default"); // remove document wide code-styling
         this.render();
     };
