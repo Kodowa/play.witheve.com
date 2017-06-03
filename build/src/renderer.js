@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var microReact_1 = require("microReact");
 var util_1 = require("./util");
 var client_1 = require("./client");
@@ -23,8 +24,20 @@ exports.setActiveIds = setActiveIds;
 // MicroReact-based record renderer
 //---------------------------------------------------------
 exports.renderer = new microReact_1.Renderer();
-document.body.appendChild(exports.renderer.content);
+// wrap the app preview into a custom iframe
+var appPreviewIframe = document.createElement('iframe');
+appPreviewIframe.id = 'app-preview-iframe';
+appPreviewIframe.setAttribute('style', 'border: 0');
+document.body.appendChild(appPreviewIframe);
+// save iframe window and document refs for later
+var appPreviewWindow = appPreviewIframe.contentWindow;
+var appPreviewdoc = appPreviewWindow.document;
+appPreviewdoc.open();
+appPreviewdoc.write("\n<html>\n    <head>\n        <title>App Preview</title>\n        <link rel=\"stylesheet\" type=\"text/css\" href=\"assets/css/app-preview.css\">\n        <style id=\"app-styles\"></style>\n    </head>\n    <body></body>\n</html>\n");
+appPreviewdoc.close();
 exports.renderer.content.classList.add("application-root");
+appPreviewdoc.body.appendChild(exports.renderer.content);
+exports.renderer.content = appPreviewdoc.body;
 // These will get maintained by the client as diffs roll in
 exports.sentInputValues = {};
 exports.activeIds = {};
@@ -223,7 +236,7 @@ var svgsArr = [
     "tref",
     "tspan",
     "use",
-    "view",
+    //"view",
     "vkern"
 ];
 supportedTagsArr.push.apply(supportedTagsArr, svgsArr);
@@ -545,18 +558,22 @@ function addSVGCoods(elem, event, eveEvent) {
     eveEvent.x = coords.x;
     eveEvent.y = coords.y;
 }
-function addRootEvent(elem, event, objs) {
+function addRootEvent(elem, event, objs, eventName) {
     if (elem !== exports.activeElements["root"])
         return;
     var eveEvent = {
-        tag: objs.length === 0 ? ["click"] : ["click", "direct-target"],
+        tag: objs.length === 0 ? [eventName] : [eventName, "direct-target"],
         root: true,
         x: event.clientX,
         y: event.clientY
     };
     objs.push(eveEvent);
 }
-window.addEventListener("click", function (event) {
+/**
+ * @param event
+ */
+// @todo: choose a more suitable name
+function ideAppOnClick(event) {
     var target = event.target;
     var current = target;
     var objs = [];
@@ -570,7 +587,7 @@ window.addEventListener("click", function (event) {
             addSVGCoods(current, event, eveEvent);
             objs.push(eveEvent);
         }
-        addRootEvent(current, event, objs);
+        addRootEvent(current, event, objs, "click");
         current = current.parentElement;
     }
     client_1.client.sendEvent(objs);
@@ -590,26 +607,12 @@ window.addEventListener("click", function (event) {
             event.preventDefault();
         }
     }
-});
-window.addEventListener("dblclick", function (event) {
-    var target = event.target;
-    var current = target;
-    var objs = [];
-    while (current) {
-        if (current.entity) {
-            var tag = ["double-click"];
-            if (current == target) {
-                tag.push("direct-target");
-            }
-            var eveEvent = { tag: tag, element: current.entity };
-            addSVGCoods(current, event, eveEvent);
-            objs.push(eveEvent);
-        }
-        addRootEvent(current, event, objs);
-        current = current.parentElement;
-    }
-    client_1.client.sendEvent(objs);
-});
+}
+appPreviewWindow.addEventListener("click", ideAppOnClick);
+window.addEventListener("click", ideAppOnClick);
+window.addEventListener("dblclick", handleBasicEventWithTarget("dblclick"));
+window.addEventListener("mousedown", handleBasicEventWithTarget("mousedown"));
+window.addEventListener("mouseup", handleBasicEventWithTarget("mouseup"));
 window.addEventListener("input", function (event) {
     var target = event.target;
     if (target.entity) {
@@ -646,7 +649,7 @@ window.addEventListener("change", function (event) {
         }
         var value = target.value;
         if (isSelectElem(target)) {
-            value = target.options[target.selectedIndex].value;
+            value = target.options.item(target.selectedIndex).value;
         }
         exports.sentInputValues[target.entity].push(value);
         var tag = ["change"];
@@ -666,6 +669,27 @@ function getFocusPath(target) {
         current = parent_4;
     }
     return path;
+}
+function handleBasicEventWithTarget(name) {
+    return function (event) {
+        var target = event.target;
+        var current = target;
+        var objs = [];
+        while (current) {
+            if (current.entity) {
+                var tag = [name];
+                if (current == target) {
+                    tag.push("direct-target");
+                }
+                var eveEvent = { tag: tag, element: current.entity };
+                addSVGCoods(current, event, eveEvent);
+                objs.push(eveEvent);
+            }
+            addRootEvent(current, event, objs, name);
+            current = current.parentElement;
+        }
+        client_1.client.sendEvent(objs);
+    };
 }
 window.addEventListener("focus", function (event) {
     var target = event.target;

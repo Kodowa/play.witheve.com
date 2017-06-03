@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Generic join in Typescript over triples (EAVs)
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var perf = global["perf"];
 var block_1 = require("./block");
 var id_1 = require("./id");
@@ -138,7 +144,7 @@ var Scan = (function () {
         var solving = [];
         var solveNode = this.node !== undefined;
         var depth = solveNode ? 4 : 3;
-        this._fullScanLookup(index.eavIndex, solving, results, resolved, 0, 0, depth);
+        this._fullScanLookup(index.aveIndex, solving, results, [a, v, e, node], 0, 0, depth);
         return results;
     };
     Scan.prototype.setProposal = function (index, toProvide, scopeIx) {
@@ -215,12 +221,12 @@ var Scan = (function () {
                 default:
                     if (proposal.providing === undefined) {
                         var providing = proposal.providing = [];
-                        if (e === undefined)
-                            providing.push(this.e);
                         if (a === undefined)
                             providing.push(this.a);
                         if (v === undefined)
                             providing.push(this.v);
+                        if (e === undefined)
+                            providing.push(this.e);
                         if (node === undefined && this.node !== undefined)
                             providing.push(this.node);
                     }
@@ -390,7 +396,7 @@ exports.Constraint = Constraint;
 var GenerateId = (function (_super) {
     __extends(GenerateId, _super);
     function GenerateId() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     GenerateId.prototype.resolveProposal = function (proposal, prefix) {
         var args = this.resolve(prefix).args;
@@ -677,6 +683,10 @@ function joinRound(multiIndex, providers, prefix, rounds, rows, options) {
             bestProposal = proposed;
             bestProvider = provider;
             bestProviderIx = ix;
+            if (proposed.cardinality === 0) {
+                solverInfo[ix]++;
+                break;
+            }
         }
         ix++;
     }
@@ -684,8 +694,6 @@ function joinRound(multiIndex, providers, prefix, rounds, rows, options) {
     // if we never found a provider that means we have no more valid solutions
     // and we have nothing more to do
     if (bestProvider === undefined || bestProposal.cardinality === 0) {
-        if (bestProviderIx !== undefined)
-            solverInfo[bestProviderIx]++;
         return;
     }
     // Otherwise, we ask the provider to resolve their proposal into values that

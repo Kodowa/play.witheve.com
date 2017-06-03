@@ -1,7 +1,8 @@
+"use strict";
 //---------------------------------------------------------------------
 // RuntimeClient
 //---------------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var runtime_1 = require("./runtime");
 var parser = require("./parser");
 var builder = require("./builder");
@@ -10,6 +11,8 @@ var browserSession_1 = require("./databases/browserSession");
 var system = require("./databases/system");
 var analyzer = require("./analyzer");
 var id_1 = require("./id");
+var config_1 = require("../config");
+var eveSource = require("./eveSource");
 //---------------------------------------------------------------------
 // Responder
 //---------------------------------------------------------------------
@@ -25,16 +28,17 @@ var RuntimeClient = (function () {
             console.error(errors);
         results.code = code;
         this.lastParse = results;
+        this.send(JSON.stringify({ type: "css", css: this.enabledCss() }));
         this.makeEvaluation();
         this.evaluation.fixpoint();
     };
-    RuntimeClient.prototype.makeEvaluation = function () {
+    RuntimeClient.prototype.makeEvaluation = function (parse) {
         var _this = this;
+        if (parse === void 0) { parse = this.lastParse; }
         if (this.evaluation) {
             this.evaluation.close();
             this.evaluation = undefined;
         }
-        var parse = this.lastParse;
         var build = builder.buildDoc(parse);
         var blocks = build.blocks, errors = build.errors;
         this.sendErrors(errors);
@@ -81,10 +85,14 @@ var RuntimeClient = (function () {
         this.send(JSON.stringify({ type: "comments", spans: spans, extraInfo: extraInfo }));
         return true;
     };
-    RuntimeClient.prototype.enabledCss = function () {
+    RuntimeClient.prototype.enabledCss = function (code) {
+        if (code === void 0) { code = ""; }
+        if (!code && this.lastParse)
+            code = this.lastParse.code;
         var css = "";
-        this.lastParse.code.replace(/(?:```|~~~)css\n([\w\W]*?)\n(?:```|~~~)/g, function (g0, g1) {
-            css += g1;
+        code.replace(/(?:```|~~~)css\n([\w\W]*?)\n(?:```|~~~)/g, function (g0, g1) {
+            css += g1 + "\n";
+            return "";
         });
         // remove whitespace before open braces, and add a newline after open brace
         css = css.replace(/\s*{\s*/g, " {\n");
@@ -141,23 +149,53 @@ var RuntimeClient = (function () {
             var blocks = build.blocks, buildErrors = build.errors;
             results.code = data.code;
             this.lastParse = results;
+            this.lastParse.documentId = data.documentId;
             for (var _c = 0, buildErrors_1 = buildErrors; _c < buildErrors_1.length; _c++) {
                 var error = buildErrors_1[_c];
                 error.injectSpan(spans, extraInfo);
             }
-            this.send(JSON.stringify({ type: "parse", generation: data.generation, text: text, spans: spans, extraInfo: extraInfo, css: this.enabledCss() }));
+            this.send(JSON.stringify({ type: "parse", generation: data.generation, text: text, spans: spans, extraInfo: extraInfo, css: this.lastCss + this.enabledCss() }));
         }
         else if (data.type === "eval") {
+            var parse = this.lastParse;
+            if (config_1.config.multiDoc) {
+                var code = "";
+                var documents = eveSource.fetchAll("root");
+                var css = "";
+                var currentCss = "";
+                for (var documentId in documents) {
+                    code += "# !!! " + documentId + " !!! \n";
+                    code += documents[documentId] + "\n\n";
+                    if (this.lastParse && documentId !== this.lastParse.documentId) {
+                        css += this.enabledCss(documents[documentId]) + "\n\n";
+                    }
+                    else {
+                        currentCss = this.enabledCss(documents[documentId]) + "\n\n";
+                    }
+                }
+                var _d = parser.parseDoc(code || "", "user"), results = _d.results, errors = _d.errors;
+                var text = results.text, spans = results.spans, extraInfo = results.extraInfo;
+                var build = builder.buildDoc(results);
+                var blocks = build.blocks, buildErrors = build.errors;
+                results.code = code;
+                parse = results;
+                for (var _e = 0, buildErrors_2 = buildErrors; _e < buildErrors_2.length; _e++) {
+                    var error = buildErrors_2[_e];
+                    error.injectSpan(spans, extraInfo);
+                }
+                this.lastCss = css;
+                this.send(JSON.stringify({ type: "css", css: css + currentCss }));
+            }
             if (this.evaluation !== undefined && data.persist) {
                 var changes = this.evaluation.createChanges();
                 var session = this.evaluation.getDatabase("session");
-                for (var _d = 0, _e = session.blocks; _d < _e.length; _d++) {
-                    var block = _e[_d];
+                for (var _f = 0, _g = session.blocks; _f < _g.length; _f++) {
+                    var block = _g[_f];
                     if (block.bindActions.length) {
                         block.updateBinds({ positions: {}, info: [] }, changes);
                     }
                 }
-                var build = builder.buildDoc(this.lastParse);
+                var build = builder.buildDoc(parse);
                 var blocks = build.blocks, errors = build.errors;
                 var spans = [];
                 var extraInfo = {};
@@ -165,8 +203,8 @@ var RuntimeClient = (function () {
                     analyzer.analyze(blocks.map(function (block) { return block.parse; }), spans, extraInfo);
                 }
                 this.sendErrors(errors);
-                for (var _f = 0, blocks_1 = blocks; _f < blocks_1.length; _f++) {
-                    var block = blocks_1[_f];
+                for (var _h = 0, blocks_1 = blocks; _h < blocks_1.length; _h++) {
+                    var block = blocks_1[_h];
                     if (block.singleRun)
                         block.dormant = true;
                 }
@@ -179,7 +217,7 @@ var RuntimeClient = (function () {
             else {
                 var spans = [];
                 var extraInfo = {};
-                this.makeEvaluation();
+                this.makeEvaluation(parse);
                 this.evaluation.fixpoint();
             }
         }
@@ -247,8 +285,8 @@ var RuntimeClient = (function () {
         else if (data.type === "findPerformance") {
             var perf = this.evaluation.perf;
             var userBlocks = {};
-            for (var _g = 0, _h = this.evaluation.getDatabase("session").blocks; _g < _h.length; _g++) {
-                var block = _h[_g];
+            for (var _j = 0, _k = this.evaluation.getDatabase("session").blocks; _j < _k.length; _j++) {
+                var block = _k[_j];
                 userBlocks[block.id] = true;
             }
             var perfInfo = perf.asObject(userBlocks);
@@ -273,8 +311,8 @@ var RuntimeClient = (function () {
             var extraInfo = {};
             this.makeEvaluation();
             var blocks = this.evaluation.getDatabase("session").blocks;
-            for (var _j = 0, blocks_2 = blocks; _j < blocks_2.length; _j++) {
-                var block = blocks_2[_j];
+            for (var _l = 0, blocks_2 = blocks; _l < blocks_2.length; _l++) {
+                var block = blocks_2[_l];
                 if (block.singleRun) {
                     block.dormant = true;
                 }

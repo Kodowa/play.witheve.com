@@ -1,7 +1,8 @@
+"use strict";
 //---------------------------------------------------------------------
 // Runtime
 //---------------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var performance_1 = require("./performance");
 var TRACK_PERFORMANCE = true;
 var MAX_ROUNDS = 300;
@@ -213,6 +214,7 @@ var Evaluation = (function () {
             // console.log(changes);
             commit = changes.commit();
             blocks = this.blocksFromCommit(commit);
+            // console.groupEnd();
         }
         if (changes.round >= MAX_ROUNDS) {
             this.error("Fixpoint Error", "Evaluation failed to fixpoint");

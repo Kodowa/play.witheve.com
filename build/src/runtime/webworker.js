@@ -1,6 +1,6 @@
 "use strict";
 //---------------------------------------------------------------------
-// Browser
+// Webworker client
 //---------------------------------------------------------------------
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -13,63 +13,71 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-var client_1 = require("../client");
+var eveSource = require("./eveSource");
+var config_1 = require("../config");
 var runtimeClient_1 = require("./runtimeClient");
 var http_1 = require("./databases/http");
 var browserSession_1 = require("./databases/browserSession");
 //---------------------------------------------------------------------
-// Utils
-//---------------------------------------------------------------------
-// this makes me immensely sad...
-function download(filename, text) {
-    var element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-}
-//---------------------------------------------------------------------
 // Responder
 //---------------------------------------------------------------------
-var BrowserRuntimeClient = (function (_super) {
-    __extends(BrowserRuntimeClient, _super);
-    function BrowserRuntimeClient(client) {
+var WebworkerRuntimeClient = (function (_super) {
+    __extends(WebworkerRuntimeClient, _super);
+    function WebworkerRuntimeClient(showIDE) {
         var _this = this;
         var dbs = {
             "http": new http_1.HttpDatabase()
         };
-        if (client.showIDE) {
+        if (showIDE) {
             dbs["view"] = new browserSession_1.BrowserViewDatabase();
             dbs["editor"] = new browserSession_1.BrowserEditorDatabase();
             dbs["inspector"] = new browserSession_1.BrowserInspectorDatabase();
         }
         _this = _super.call(this, dbs) || this;
-        _this.client = client;
         return _this;
     }
-    BrowserRuntimeClient.prototype.send = function (json) {
-        var _this = this;
-        setTimeout(function () {
-            _this.client.onMessage({ data: json });
-        }, 0);
+    WebworkerRuntimeClient.prototype.send = function (json) {
+        postMessage(json, undefined);
     };
-    return BrowserRuntimeClient;
+    return WebworkerRuntimeClient;
 }(runtimeClient_1.RuntimeClient));
 //---------------------------------------------------------------------
 // Init a program
 //---------------------------------------------------------------------
-function init(code) {
+function init(code, showIDE) {
     global["browser"] = true;
-    exports.responder = new BrowserRuntimeClient(client_1.client);
+    exports.responder = new WebworkerRuntimeClient(showIDE);
     exports.responder.load(code || "", "user");
-    global["evaluation"] = exports.responder;
-    global["save"] = function () {
-        exports.responder.handleEvent(JSON.stringify({ type: "dumpState" }));
-    };
-    // client.socket.onopen();
-    // responder.handleEvent(JSON.stringify({type: "findPerformance", requestId: 2}));
 }
 exports.init = init;
-//# sourceMappingURL=browser.js.map
+//---------------------------------------------------------------------
+// Messages
+//---------------------------------------------------------------------
+function onmessage(event) {
+    var data = JSON.parse(event.data);
+    if (typeof data !== "object") {
+        console.error("WORKER: Unknown message: " + data);
+        return;
+    }
+    if (data.type === "init") {
+        // since we're working in a totally different context, we need to load the
+        // workspace information that the browser normally has into the webworker
+        // context
+        eveSource.loadWorkspaces(data.workspaces);
+        global["_workspaceCache"] = data.workspaceCache;
+        config_1.init(data.config);
+        init(data.code, data.showIDE);
+    }
+    else if (data.type === "save") {
+        var workspace = eveSource.getWorkspaceFromPath(data.path);
+        global["_workspaceCache"][workspace][data.path] = data.code;
+    }
+    else if (data.type !== undefined) {
+        exports.responder.handleEvent(event.data);
+    }
+    else {
+        console.error("WORKER: Unknown message type: " + data.type);
+    }
+}
+exports.onmessage = onmessage;
+//# sourceMappingURL=webworker.js.map

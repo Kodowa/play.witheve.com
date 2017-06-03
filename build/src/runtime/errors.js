@@ -1,7 +1,8 @@
+"use strict";
 //--------------------------------------------------------------
 // Errors
 //--------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var chevrotain_1 = require("chevrotain");
 var parser = require("./parser");
 var SPAN_TYPE = "document_comment";
@@ -73,8 +74,8 @@ function parserErrors(errors, parseInfo) {
         else {
             console.log("UNHANDLED ERROR TYPE", name_1);
             var start = token.startOffset;
-            var stop = token.startOffset + token.image.length;
-            eveError = new EveError(blockId, start, stop, message, context);
+            var stop_1 = token.startOffset + token.image.length;
+            eveError = new EveError(blockId, start, stop_1, message, context);
         }
         eveError.injectSpan(spans, extraInfo);
         normalized.push(eveError);
@@ -213,6 +214,11 @@ function incompatabileTransitiveEquality(block, variable, value) {
     return new EveError(id, start, stop, exports.messages.variableNeverEqual(variable, variable.constant, value));
 }
 exports.incompatabileTransitiveEquality = incompatabileTransitiveEquality;
+function unrecognisedFunctionAttribute(block, expression, attribute) {
+    var id = block.id, blockStart = block.start;
+    return new EveError(id, attribute.startOffset, attribute.endOffset, exports.messages.unrecognisedFunctionAttribute(attribute.attribute, expression.op));
+}
+exports.unrecognisedFunctionAttribute = unrecognisedFunctionAttribute;
 //--------------------------------------------------------------
 // Messages
 //--------------------------------------------------------------
@@ -228,6 +234,7 @@ exports.messages = {
     unclosedPair: function (type) { return "Looks like a close " + PairToName[type] + " is missing"; },
     extraCloseChar: function (char) { return "This close " + PairToName[char] + " is missing an open " + PairToName[char]; },
     unprovidedVariable: function (varName) { return "Nothing is providing a value for " + varName; },
+    unrecognisedFunctionAttribute: function (attributeName, functionName) { return attributeName + " is not a recognised attribute for " + functionName + "."; },
     unimplementedExpression: function (op) { return "There's no definition for the function " + op; },
     blankScan: function () { return 'Lookup requires at least one attribute: record, attribute, value, or node'; },
     invalidLookupAction: function (missing) { return "Updating a lookup requires that record, attribute, and value all be provided. Looks like " + missing.join("and") + " is missing."; },

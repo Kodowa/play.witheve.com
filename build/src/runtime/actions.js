@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Actions
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var join_1 = require("./join");
 //---------------------------------------------------------------------
 // Actions
@@ -43,7 +49,7 @@ exports.Action = Action;
 var InsertAction = (function (_super) {
     __extends(InsertAction, _super);
     function InsertAction() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     InsertAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -58,7 +64,7 @@ exports.InsertAction = InsertAction;
 var RemoveAction = (function (_super) {
     __extends(RemoveAction, _super);
     function RemoveAction() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     RemoveAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -73,7 +79,7 @@ exports.RemoveAction = RemoveAction;
 var RemoveSupportAction = (function (_super) {
     __extends(RemoveSupportAction, _super);
     function RemoveSupportAction() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     RemoveSupportAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];
@@ -89,7 +95,7 @@ exports.RemoveSupportAction = RemoveSupportAction;
 var EraseAction = (function (_super) {
     __extends(EraseAction, _super);
     function EraseAction() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     EraseAction.prototype.removeVs = function (index, changes, scope, e, a) {
         var keys = Object.keys(index);
@@ -129,7 +135,7 @@ exports.EraseAction = EraseAction;
 var SetAction = (function (_super) {
     __extends(SetAction, _super);
     function SetAction() {
-        return _super.apply(this, arguments) || this;
+        return _super !== null && _super.apply(this, arguments) || this;
     }
     SetAction.prototype.execute = function (multiIndex, row, changes) {
         var _a = this.resolve(row), e = _a[0], a = _a[1], v = _a[2];

@@ -1,4 +1,4 @@
-/*! chevrotain - v0.18.0 */
+/*! chevrotain - v0.19.0 */
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
@@ -69,7 +69,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 */
 	var API = {};
 	// semantic version
-	API.VERSION = "0.18.0";
+	API.VERSION = "0.19.0";
 	// runtime API
 	API.Parser = parser_public_1.Parser;
 	API.ParserDefinitionErrorType = parser_public_1.ParserDefinitionErrorType;
@@ -988,7 +988,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	                this._productions.put(name, cachedProduction);
 	            }
 	        }
-	        return this.defineRule(name, implementation, config);
+	        var ruleImplementation = this.defineRule(name, implementation, config);
+	        this[name] = ruleImplementation;
+	        return ruleImplementation;
 	    };
 	    /**
 	     * @See RULE
@@ -1701,7 +1703,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    };
 	    // TODO: consider caching the error message computed information
 	    Parser.prototype.raiseNoAltException = function (occurrence, errMsgTypes) {
-	        var errSuffix = " but found: '" + tokens_public_1.getImage(this.LA(1)) + "'";
+	        var errSuffix = "\nbut found: '" + tokens_public_1.getImage(this.LA(1)) + "'";
 	        if (errMsgTypes === undefined) {
 	            var ruleName = this.getCurrRuleFullName();
 	            var ruleGrammar = this.getGAstProductions().get(ruleName);
@@ -1709,11 +1711,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	            var lookAheadPathsPerAlternative = lookahead_1.getLookaheadPathsForOr(occurrence, ruleGrammar, this.maxLookahead);
 	            var allLookAheadPaths = utils_1.reduce(lookAheadPathsPerAlternative, function (result, currAltPaths) { return result.concat(currAltPaths); }, []);
 	            var nextValidTokenSequences = utils_1.map(allLookAheadPaths, function (currPath) {
-	                return ("[" + utils_1.map(currPath, function (currTokenClass) { return tokens_public_1.tokenLabel(currTokenClass); }).join(",") + "]");
+	                return ("[" + utils_1.map(currPath, function (currTokenClass) { return tokens_public_1.tokenLabel(currTokenClass); }).join(", ") + "]");
 	            });
-	            errMsgTypes = "one of these possible Token sequences:\n  <" + nextValidTokenSequences.join(" ,") + ">";
+	            var nextValidSequenceItems = utils_1.map(nextValidTokenSequences, function (itemMsg, idx) { return ("  " + (idx + 1) + ". " + itemMsg); });
+	            errMsgTypes = "one of these possible Token sequences:\n" + nextValidSequenceItems.join("\n");
 	        }
-	        throw this.SAVE_ERROR(new exceptions_public_1.exceptions.NoViableAltException("Expecting: " + errMsgTypes + " " + errSuffix, this.LA(1)));
+	        throw this.SAVE_ERROR(new exceptions_public_1.exceptions.NoViableAltException("Expecting: " + errMsgTypes + errSuffix, this.LA(1)));
 	    };
 	    Parser.prototype.getLookaheadFuncFor = function (key, occurrence, laFuncBuilder, maxLookahead) {
 	        var laFunc = this.classLAFuncs.get(key);

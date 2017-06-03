@@ -1,12 +1,18 @@
+"use strict";
 //---------------------------------------------------------------------
 // Server
 //---------------------------------------------------------------------
-"use strict";
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
 var http = require("http");
 var fs = require("fs");
 var path = require("path");
@@ -39,7 +45,7 @@ global["browser"] = false;
 var HTTPRuntimeClient = (function (_super) {
     __extends(HTTPRuntimeClient, _super);
     function HTTPRuntimeClient() {
-        var _this;
+        var _this = this;
         var server = new server_1.ServerDatabase();
         var dbs = {
             "http": new http_1.HttpDatabase(),
@@ -143,7 +149,7 @@ function createExpressApp() {
 var SocketRuntimeClient = (function (_super) {
     __extends(SocketRuntimeClient, _super);
     function SocketRuntimeClient(socket, withIDE) {
-        var _this;
+        var _this = this;
         var dbs = {
             "http": new http_1.HttpDatabase(),
             "shared": shared,
@@ -198,7 +204,7 @@ function IDEMessageHandler(client, message) {
         if (!isLocal && !content && config_1.config.path && fs.existsSync("." + path_1)) {
             content = fs.readFileSync("." + path_1).toString();
         }
-        ws.send(JSON.stringify({ type: "initProgram", runtimeOwner: runtimeOwner, controlOwner: controlOwner, path: path_1, code: content, internal: internal, withIDE: editor }));
+        ws.send(JSON.stringify({ type: "initProgram", path: path_1, code: content, config: config_1.config, workspaces: eveSource.workspaces }));
         if (runtimeOwner === config_1.Owner.server) {
             client.load(content, "user");
         }
@@ -207,6 +213,8 @@ function IDEMessageHandler(client, message) {
         eveSource.save(data.path, data.code);
     }
     else if (data.type === "ping") {
+        // we don't need to do anything with pings, they're just to make sure hosts like
+        // Heroku don't shutdown our server.
     }
     else {
         client.handleEvent(message);
@@ -219,7 +227,7 @@ function MessageHandler(client, message) {
         var editor = config_1.config.editor, runtimeOwner = config_1.config.runtimeOwner, controlOwner = config_1.config.controlOwner, filepath = config_1.config.path;
         // we do nothing here since the server is in charge of handling init.
         var content = fs.readFileSync(filepath).toString();
-        ws.send(JSON.stringify({ type: "initProgram", runtimeOwner: runtimeOwner, controlOwner: controlOwner, path: filepath, code: content, withIDE: editor }));
+        ws.send(JSON.stringify({ type: "initProgram", path: filepath, code: content, config: config_1.config, workspaces: eveSource.workspaces }));
         if (runtimeOwner === config_1.Owner.server) {
             client.load(content, "user");
         }
@@ -228,6 +236,8 @@ function MessageHandler(client, message) {
         client.handleEvent(message);
     }
     else if (data.type === "ping") {
+        // we don't need to do anything with pings, they're just to make sure hosts like
+        // Heroku don't shutdown our server.
     }
     else {
         console.error("Invalid message sent: " + message);
@@ -238,6 +248,7 @@ function initWebsocket(wss, withIDE) {
         var client = new SocketRuntimeClient(ws, withIDE);
         var handler = withIDE ? IDEMessageHandler : MessageHandler;
         if (!withIDE) {
+            // we need to initialize
         }
         ws.on('message', function (message) {
             handler(client, message);

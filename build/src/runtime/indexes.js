@@ -1,7 +1,8 @@
+"use strict";
 //---------------------------------------------------------------------
 // Indexes
 //---------------------------------------------------------------------
-"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 //---------------------------------------------------------------------
 // MultiIndex
 //---------------------------------------------------------------------
@@ -226,6 +227,7 @@ var IndexLevel = (function () {
         }
         var updated = this;
         if (newChild.version > this.version) {
+            // updated = this.clone(version)
         }
         if (child === undefined) {
             updated.cardinality++;

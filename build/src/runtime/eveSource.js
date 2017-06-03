@@ -1,8 +1,16 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.workspaces = {};
 //---------------------------------------------------------
 // Public
 //---------------------------------------------------------
+function loadWorkspaces(neue) {
+    for (var key in neue) {
+        var value = neue[key];
+        exports.workspaces[key] = value;
+    }
+}
+exports.loadWorkspaces = loadWorkspaces;
 function add(name, directory) {
     // If we're running on a windows server, normalize slashes
     if (typeof window === "undefined") {
@@ -110,10 +118,10 @@ var fetchFile = function (file, workspace) {
 var fetchWorkspace = function (workspace) {
     return global["_workspaceCache"][workspace];
 };
+var fs = require("fs");
 // If we're running on the server, we use the actual file-system.
-if (typeof window === "undefined") {
+if (fs.readFileSync) {
     var glob_1 = require("glob");
-    var fs_1 = require("fs");
     var path_1 = require("path");
     var mkdirp_1 = require("mkdirp");
     saveFile = function (file, content, workspace) {
@@ -121,7 +129,7 @@ if (typeof window === "undefined") {
             var filepath = getAbsolutePath(file, workspace);
             var dirname = path_1.dirname(filepath);
             mkdirp_1.sync(dirname);
-            fs_1.writeFileSync(filepath, content);
+            fs.writeFileSync(filepath, content);
         }
         catch (err) {
             console.warn("Unable to save file '" + file + "' in '" + workspace + "' containing:\n" + content);
@@ -130,7 +138,7 @@ if (typeof window === "undefined") {
     fetchFile = function (file, workspace) {
         try {
             var filepath = getAbsolutePath(file, workspace);
-            return fs_1.readFileSync(filepath).toString();
+            return fs.readFileSync(filepath).toString();
         }
         catch (err) {
             console.warn("Unable to find file '" + file + "' in '" + workspace + "'");
@@ -145,7 +153,7 @@ if (typeof window === "undefined") {
             for (var _a = 0, _b = glob_1.sync(directory + pattern, { ignore: directory + "**/node_modules" + pattern }); _a < _b.length; _a++) {
                 var file = _b[_a];
                 var rel = path_1.relative(directory, file);
-                files["/" + workspace + "/" + rel] = fs_1.readFileSync(file).toString();
+                files["/" + workspace + "/" + rel] = fs.readFileSync(file).toString();
             }
         }
         return files;
@@ -159,6 +167,10 @@ function pack() {
     return "var _workspaceCache = " + JSON.stringify(packaged, null, 2) + ";\n";
 }
 exports.pack = pack;
+function fetchAll(workspace) {
+    return fetchWorkspace(workspace);
+}
+exports.fetchAll = fetchAll;
 // If we're running on the client, load the server's workspaces from the cache it passes us.
 if (global["_workspaceCache"]) {
     for (var workspace in global["_workspaceCache"]) {

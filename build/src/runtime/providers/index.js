@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var providers = {};
 function provide(name, klass) {
     providers[name] = klass;

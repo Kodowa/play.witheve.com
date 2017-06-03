@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 function deprecated(message) {
     if (message === void 0) { message = 'Function {name} is deprecated.'; }
     return function (instance, name, descriptor) {
