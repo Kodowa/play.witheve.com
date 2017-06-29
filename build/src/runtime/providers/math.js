@@ -58,22 +58,22 @@ var TrigConstraint = (function (_super) {
         }
         return radians;
     };
+    TrigConstraint.AttributeMapping = {
+        "degrees": 0,
+        "radians": 1
+    };
     return TrigConstraint;
 }(TotalFunctionConstraint));
-TrigConstraint.AttributeMapping = {
-    "degrees": 0,
-    "radians": 1
-};
 var ValueOnlyConstraint = (function (_super) {
     __extends(ValueOnlyConstraint, _super);
     function ValueOnlyConstraint() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    ValueOnlyConstraint.AttributeMapping = {
+        "value": 0
+    };
     return ValueOnlyConstraint;
 }(TotalFunctionConstraint));
-ValueOnlyConstraint.AttributeMapping = {
-    "value": 0
-};
 function radiansToDegrees(radians) {
     return radians * (180 / Math.PI);
 }
@@ -206,12 +206,12 @@ var ATan2 = (function (_super) {
     ATan2.prototype.getReturnValue = function (args) {
         return (Math.atan2(args[0], args[1]));
     };
+    ATan2.AttributeMapping = {
+        "x": 0,
+        "y": 1
+    };
     return ATan2;
 }(TotalFunctionConstraint));
-ATan2.AttributeMapping = {
-    "x": 0,
-    "y": 1
-};
 //Hyperbolic Functions
 var SinH = (function (_super) {
     __extends(SinH, _super);
@@ -328,12 +328,12 @@ var Log = (function (_super) {
         }
         return (Math.log(args[0]) / baselog);
     };
+    Log.AttributeMapping = {
+        "value": 0,
+        "base": 1
+    };
     return Log;
 }(TotalFunctionConstraint));
-Log.AttributeMapping = {
-    "value": 0,
-    "base": 1
-};
 var Exp = (function (_super) {
     __extends(Exp, _super);
     function Exp() {
@@ -352,12 +352,12 @@ var Pow = (function (_super) {
     Pow.prototype.getReturnValue = function (args) {
         return Math.pow(args[0], args[1]);
     };
+    Pow.AttributeMapping = {
+        "value": 0,
+        "by": 1,
+    };
     return Pow;
 }(TotalFunctionConstraint));
-Pow.AttributeMapping = {
-    "value": 0,
-    "by": 1,
-};
 var Mod = (function (_super) {
     __extends(Mod, _super);
     function Mod() {
@@ -366,12 +366,12 @@ var Mod = (function (_super) {
     Mod.prototype.getReturnValue = function (args) {
         return args[0] % args[1];
     };
+    Mod.AttributeMapping = {
+        "value": 0,
+        "by": 1,
+    };
     return Mod;
 }(TotalFunctionConstraint));
-Mod.AttributeMapping = {
-    "value": 0,
-    "by": 1,
-};
 var Abs = (function (_super) {
     __extends(Abs, _super);
     function Abs() {
@@ -414,12 +414,12 @@ var Random = (function (_super) {
             return found;
         return Random.cache[seed] = Math.random();
     };
+    Random.AttributeMapping = {
+        "seed": 0,
+    };
+    Random.cache = {};
     return Random;
 }(TotalFunctionConstraint));
-Random.AttributeMapping = {
-    "seed": 0,
-};
-Random.cache = {};
 var Gaussian = (function (_super) {
     __extends(Gaussian, _super);
     function Gaussian() {
@@ -442,14 +442,14 @@ var Gaussian = (function (_super) {
         Gaussian.cache[key] = res;
         return res;
     };
+    Gaussian.AttributeMapping = {
+        "seed": 0,
+        "stdev": 1,
+        "mean": 2
+    };
+    Gaussian.cache = {};
     return Gaussian;
 }(TotalFunctionConstraint));
-Gaussian.AttributeMapping = {
-    "seed": 0,
-    "stdev": 1,
-    "mean": 2
-};
-Gaussian.cache = {};
 var Round = (function (_super) {
     __extends(Round, _super);
     function Round() {
@@ -479,12 +479,12 @@ var ToFixed = (function (_super) {
     ToFixed.prototype.getReturnValue = function (args) {
         return args[0].toFixed(args[1]);
     };
+    ToFixed.AttributeMapping = {
+        "value": 0,
+        "places": 1,
+    };
     return ToFixed;
 }(TotalFunctionConstraint));
-ToFixed.AttributeMapping = {
-    "value": 0,
-    "places": 1,
-};
 var Range = (function (_super) {
     __extends(Range, _super);
     function Range() {
@@ -533,13 +533,13 @@ var Range = (function (_super) {
         proposal.cardinality = Math.ceil(Math.abs((to - from + 1) / increment));
         return proposal;
     };
+    Range.AttributeMapping = {
+        "from": 0,
+        "to": 1,
+        "increment": 2,
+    };
     return Range;
 }(join_1.Constraint));
-Range.AttributeMapping = {
-    "from": 0,
-    "to": 1,
-    "increment": 2,
-};
 //Constants
 var PI = (function (_super) {
     __extends(PI, _super);

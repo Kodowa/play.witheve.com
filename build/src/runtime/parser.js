@@ -127,29 +127,29 @@ var DocContent = (function (_super) {
     function DocContent() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    DocContent.PATTERN = /[^\n]+/;
     return DocContent;
 }(Token));
-DocContent.PATTERN = /[^\n]+/;
 exports.DocContent = DocContent;
 var Fence = (function (_super) {
     __extends(Fence, _super);
     function Fence() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    Fence.PATTERN = /```|~~~/;
+    Fence.PUSH_MODE = "code";
     return Fence;
 }(Token));
-Fence.PATTERN = /```|~~~/;
-Fence.PUSH_MODE = "code";
 exports.Fence = Fence;
 var CloseFence = (function (_super) {
     __extends(CloseFence, _super);
     function CloseFence() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    CloseFence.PATTERN = /```|~~~/;
+    CloseFence.POP_MODE = true;
     return CloseFence;
 }(Token));
-CloseFence.PATTERN = /```|~~~/;
-CloseFence.POP_MODE = true;
 exports.CloseFence = CloseFence;
 // Comments
 var CommentLine = (function (_super) {
@@ -159,10 +159,10 @@ var CommentLine = (function (_super) {
         _this.label = "comment";
         return _this;
     }
+    CommentLine.PATTERN = /\/\/.*\n/;
+    CommentLine.GROUP = "comments";
     return CommentLine;
 }(Token));
-CommentLine.PATTERN = /\/\/.*\n/;
-CommentLine.GROUP = "comments";
 exports.CommentLine = CommentLine;
 // Operators
 var Equality = (function (_super) {
@@ -172,9 +172,9 @@ var Equality = (function (_super) {
         _this.label = "equality";
         return _this;
     }
+    Equality.PATTERN = /:|=/;
     return Equality;
 }(Token));
-Equality.PATTERN = /:|=/;
 exports.Equality = Equality;
 var Comparison = (function (_super) {
     __extends(Comparison, _super);
@@ -183,9 +183,9 @@ var Comparison = (function (_super) {
         _this.label = "comparison";
         return _this;
     }
+    Comparison.PATTERN = />=|<=|!=|>|</;
     return Comparison;
 }(Token));
-Comparison.PATTERN = />=|<=|!=|>|</;
 exports.Comparison = Comparison;
 var AddInfix = (function (_super) {
     __extends(AddInfix, _super);
@@ -194,9 +194,9 @@ var AddInfix = (function (_super) {
         _this.label = "infix";
         return _this;
     }
+    AddInfix.PATTERN = /\+|-/;
     return AddInfix;
 }(Token));
-AddInfix.PATTERN = /\+|-/;
 exports.AddInfix = AddInfix;
 var MultInfix = (function (_super) {
     __extends(MultInfix, _super);
@@ -205,9 +205,9 @@ var MultInfix = (function (_super) {
         _this.label = "infix";
         return _this;
     }
+    MultInfix.PATTERN = /\*|\//;
     return MultInfix;
 }(Token));
-MultInfix.PATTERN = /\*|\//;
 exports.MultInfix = MultInfix;
 var Merge = (function (_super) {
     __extends(Merge, _super);
@@ -216,9 +216,9 @@ var Merge = (function (_super) {
         _this.label = "merge";
         return _this;
     }
+    Merge.PATTERN = /<-/;
     return Merge;
 }(Token));
-Merge.PATTERN = /<-/;
 exports.Merge = Merge;
 var Set = (function (_super) {
     __extends(Set, _super);
@@ -227,9 +227,9 @@ var Set = (function (_super) {
         _this.label = "set";
         return _this;
     }
+    Set.PATTERN = /:=/;
     return Set;
 }(Token));
-Set.PATTERN = /:=/;
 exports.Set = Set;
 var Mutate = (function (_super) {
     __extends(Mutate, _super);
@@ -238,9 +238,9 @@ var Mutate = (function (_super) {
         _this.label = "mutate";
         return _this;
     }
+    Mutate.PATTERN = /\+=|-=/;
     return Mutate;
 }(Token));
-Mutate.PATTERN = /\+=|-=/;
 exports.Mutate = Mutate;
 var Dot = (function (_super) {
     __extends(Dot, _super);
@@ -249,9 +249,9 @@ var Dot = (function (_super) {
         _this.label = "dot";
         return _this;
     }
+    Dot.PATTERN = /\./;
     return Dot;
 }(Token));
-Dot.PATTERN = /\./;
 exports.Dot = Dot;
 var Pipe = (function (_super) {
     __extends(Pipe, _super);
@@ -260,9 +260,9 @@ var Pipe = (function (_super) {
         _this.label = "pipe";
         return _this;
     }
+    Pipe.PATTERN = /\|/;
     return Pipe;
 }(Token));
-Pipe.PATTERN = /\|/;
 exports.Pipe = Pipe;
 // Identifier
 var Identifier = (function (_super) {
@@ -272,9 +272,9 @@ var Identifier = (function (_super) {
         _this.label = "identifier";
         return _this;
     }
+    Identifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=[^\\[])");
     return Identifier;
 }(Token));
-Identifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=[^\\[])");
 exports.Identifier = Identifier;
 var FunctionIdentifier = (function (_super) {
     __extends(FunctionIdentifier, _super);
@@ -283,9 +283,9 @@ var FunctionIdentifier = (function (_super) {
         _this.label = "functionIdentifier";
         return _this;
     }
+    FunctionIdentifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=\\[)");
     return FunctionIdentifier;
 }(Token));
-FunctionIdentifier.PATTERN = new RegExp("([\\+-/\\*][^\\s" + breakChars + "]+|[^\\d" + breakChars + "\\+-/\\*][^\\s" + breakChars + "]*)(?=\\[)");
 exports.FunctionIdentifier = FunctionIdentifier;
 // Keywords
 var Keyword = (function (_super) {
@@ -293,10 +293,10 @@ var Keyword = (function (_super) {
     function Keyword() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    Keyword.PATTERN = Lexer.NA;
+    Keyword.LONGER_ALT = Identifier;
     return Keyword;
 }(Token));
-Keyword.PATTERN = Lexer.NA;
-Keyword.LONGER_ALT = Identifier;
 exports.Keyword = Keyword;
 var Lookup = (function (_super) {
     __extends(Lookup, _super);
@@ -305,9 +305,9 @@ var Lookup = (function (_super) {
         _this.label = "lookup";
         return _this;
     }
+    Lookup.PATTERN = /lookup(?=\[)/;
     return Lookup;
 }(Keyword));
-Lookup.PATTERN = /lookup(?=\[)/;
 exports.Lookup = Lookup;
 var Action = (function (_super) {
     __extends(Action, _super);
@@ -316,9 +316,9 @@ var Action = (function (_super) {
         _this.label = "action";
         return _this;
     }
+    Action.PATTERN = /bind|commit/;
     return Action;
 }(Keyword));
-Action.PATTERN = /bind|commit/;
 exports.Action = Action;
 var Search = (function (_super) {
     __extends(Search, _super);
@@ -327,9 +327,9 @@ var Search = (function (_super) {
         _this.label = "search";
         return _this;
     }
+    Search.PATTERN = /search/;
     return Search;
 }(Keyword));
-Search.PATTERN = /search/;
 exports.Search = Search;
 var Is = (function (_super) {
     __extends(Is, _super);
@@ -338,9 +338,9 @@ var Is = (function (_super) {
         _this.label = "is";
         return _this;
     }
+    Is.PATTERN = /is/;
     return Is;
 }(Keyword));
-Is.PATTERN = /is/;
 exports.Is = Is;
 var If = (function (_super) {
     __extends(If, _super);
@@ -349,9 +349,9 @@ var If = (function (_super) {
         _this.label = "if";
         return _this;
     }
+    If.PATTERN = /if/;
     return If;
 }(Keyword));
-If.PATTERN = /if/;
 exports.If = If;
 var Else = (function (_super) {
     __extends(Else, _super);
@@ -360,9 +360,9 @@ var Else = (function (_super) {
         _this.label = "else";
         return _this;
     }
+    Else.PATTERN = /else/;
     return Else;
 }(Keyword));
-Else.PATTERN = /else/;
 exports.Else = Else;
 var Then = (function (_super) {
     __extends(Then, _super);
@@ -371,9 +371,9 @@ var Then = (function (_super) {
         _this.label = "then";
         return _this;
     }
+    Then.PATTERN = /then/;
     return Then;
 }(Keyword));
-Then.PATTERN = /then/;
 exports.Then = Then;
 var Not = (function (_super) {
     __extends(Not, _super);
@@ -382,9 +382,9 @@ var Not = (function (_super) {
         _this.label = "not";
         return _this;
     }
+    Not.PATTERN = /not/;
     return Not;
 }(Keyword));
-Not.PATTERN = /not/;
 exports.Not = Not;
 // Values
 var Bool = (function (_super) {
@@ -394,9 +394,9 @@ var Bool = (function (_super) {
         _this.label = "bool";
         return _this;
     }
+    Bool.PATTERN = /true|false/;
     return Bool;
 }(Keyword));
-Bool.PATTERN = /true|false/;
 exports.Bool = Bool;
 var Num = (function (_super) {
     __extends(Num, _super);
@@ -405,9 +405,9 @@ var Num = (function (_super) {
         _this.label = "num";
         return _this;
     }
+    Num.PATTERN = /-?\d+(\.\d+)?/;
     return Num;
 }(Token));
-Num.PATTERN = /-?\d+(\.\d+)?/;
 exports.Num = Num;
 var None = (function (_super) {
     __extends(None, _super);
@@ -416,9 +416,9 @@ var None = (function (_super) {
         _this.label = "none";
         return _this;
     }
+    None.PATTERN = /none/;
     return None;
 }(Keyword));
-None.PATTERN = /none/;
 exports.None = None;
 var Name = (function (_super) {
     __extends(Name, _super);
@@ -427,9 +427,9 @@ var Name = (function (_super) {
         _this.label = "name";
         return _this;
     }
+    Name.PATTERN = /@/;
     return Name;
 }(Token));
-Name.PATTERN = /@/;
 exports.Name = Name;
 var Tag = (function (_super) {
     __extends(Tag, _super);
@@ -438,9 +438,9 @@ var Tag = (function (_super) {
         _this.label = "tag";
         return _this;
     }
+    Tag.PATTERN = /#/;
     return Tag;
 }(Token));
-Tag.PATTERN = /#/;
 exports.Tag = Tag;
 var Uuid = (function (_super) {
     __extends(Uuid, _super);
@@ -449,9 +449,9 @@ var Uuid = (function (_super) {
         _this.label = "uuid";
         return _this;
     }
+    Uuid.PATTERN = /⦑.*⦒/;
     return Uuid;
 }(Token));
-Uuid.PATTERN = /⦑.*⦒/;
 exports.Uuid = Uuid;
 // Delimiters
 var OpenBracket = (function (_super) {
@@ -461,9 +461,9 @@ var OpenBracket = (function (_super) {
         _this.label = "open-bracket";
         return _this;
     }
+    OpenBracket.PATTERN = /\[/;
     return OpenBracket;
 }(Token));
-OpenBracket.PATTERN = /\[/;
 exports.OpenBracket = OpenBracket;
 var CloseBracket = (function (_super) {
     __extends(CloseBracket, _super);
@@ -472,9 +472,9 @@ var CloseBracket = (function (_super) {
         _this.label = "close-bracket";
         return _this;
     }
+    CloseBracket.PATTERN = /\]/;
     return CloseBracket;
 }(Token));
-CloseBracket.PATTERN = /\]/;
 exports.CloseBracket = CloseBracket;
 var OpenParen = (function (_super) {
     __extends(OpenParen, _super);
@@ -483,9 +483,9 @@ var OpenParen = (function (_super) {
         _this.label = "open-paren";
         return _this;
     }
+    OpenParen.PATTERN = /\(/;
     return OpenParen;
 }(Token));
-OpenParen.PATTERN = /\(/;
 exports.OpenParen = OpenParen;
 var CloseParen = (function (_super) {
     __extends(CloseParen, _super);
@@ -494,9 +494,9 @@ var CloseParen = (function (_super) {
         _this.label = "close-paren";
         return _this;
     }
+    CloseParen.PATTERN = /\)/;
     return CloseParen;
 }(Token));
-CloseParen.PATTERN = /\)/;
 exports.CloseParen = CloseParen;
 // Strings
 var StringChars = (function (_super) {
@@ -506,9 +506,9 @@ var StringChars = (function (_super) {
         _this.label = "string";
         return _this;
     }
+    StringChars.PATTERN = /(\\.|{(?=[^{])|[^"\\{])+/;
     return StringChars;
 }(Token));
-StringChars.PATTERN = /(\\.|{(?=[^{])|[^"\\{])+/;
 exports.StringChars = StringChars;
 var OpenString = (function (_super) {
     __extends(OpenString, _super);
@@ -517,10 +517,10 @@ var OpenString = (function (_super) {
         _this.label = "quote";
         return _this;
     }
+    OpenString.PATTERN = /"/;
+    OpenString.PUSH_MODE = "string";
     return OpenString;
 }(Token));
-OpenString.PATTERN = /"/;
-OpenString.PUSH_MODE = "string";
 exports.OpenString = OpenString;
 var CloseString = (function (_super) {
     __extends(CloseString, _super);
@@ -529,10 +529,10 @@ var CloseString = (function (_super) {
         _this.label = "quote";
         return _this;
     }
+    CloseString.PATTERN = /"/;
+    CloseString.POP_MODE = true;
     return CloseString;
 }(Token));
-CloseString.PATTERN = /"/;
-CloseString.POP_MODE = true;
 exports.CloseString = CloseString;
 // String Embeds
 var StringEmbedOpen = (function (_super) {
@@ -542,10 +542,10 @@ var StringEmbedOpen = (function (_super) {
         _this.label = "string-embed-open";
         return _this;
     }
+    StringEmbedOpen.PATTERN = /{{/;
+    StringEmbedOpen.PUSH_MODE = "code";
     return StringEmbedOpen;
 }(Token));
-StringEmbedOpen.PATTERN = /{{/;
-StringEmbedOpen.PUSH_MODE = "code";
 exports.StringEmbedOpen = StringEmbedOpen;
 var StringEmbedClose = (function (_super) {
     __extends(StringEmbedClose, _super);
@@ -554,10 +554,10 @@ var StringEmbedClose = (function (_super) {
         _this.label = "string-embed-close";
         return _this;
     }
+    StringEmbedClose.PATTERN = /}}/;
+    StringEmbedClose.POP_MODE = true;
     return StringEmbedClose;
 }(Token));
-StringEmbedClose.PATTERN = /}}/;
-StringEmbedClose.POP_MODE = true;
 exports.StringEmbedClose = StringEmbedClose;
 // Whitespace
 var WhiteSpace = (function (_super) {
@@ -565,10 +565,10 @@ var WhiteSpace = (function (_super) {
     function WhiteSpace() {
         return _super !== null && _super.apply(this, arguments) || this;
     }
+    WhiteSpace.PATTERN = /\s+|,/;
+    WhiteSpace.GROUP = Lexer.SKIPPED;
     return WhiteSpace;
 }(Token));
-WhiteSpace.PATTERN = /\s+|,/;
-WhiteSpace.GROUP = Lexer.SKIPPED;
 exports.WhiteSpace = WhiteSpace;
 //-----------------------------------------------------------
 // Lexers

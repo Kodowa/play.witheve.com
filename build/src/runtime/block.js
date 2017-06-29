@@ -299,8 +299,8 @@ var Block = (function () {
         // console.groupEnd();
         return changes;
     };
+    Block.BlockId = 0;
     return Block;
 }());
-Block.BlockId = 0;
 exports.Block = Block;
 //# sourceMappingURL=block.js.map

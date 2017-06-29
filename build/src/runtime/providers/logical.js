@@ -131,11 +131,11 @@ var Toggle = (function (_super) {
         proposal.cardinality = 1;
         return proposal;
     };
+    Toggle.AttributeMapping = {
+        "value": 0,
+    };
     return Toggle;
 }(join_1.Constraint));
-Toggle.AttributeMapping = {
-    "value": 0,
-};
 //---------------------------------------------------------------------
 // Internal logical providers
 //---------------------------------------------------------------------

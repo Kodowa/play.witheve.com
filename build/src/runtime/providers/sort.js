@@ -162,14 +162,14 @@ var Sort = (function (_super) {
         }
         group.result.push(value.slice());
     };
+    Sort.isAggregate = true;
+    Sort.AttributeMapping = {
+        "value": 0,
+        "direction": 1,
+        "per": 2,
+    };
     return Sort;
 }(join_1.Constraint));
-Sort.isAggregate = true;
-Sort.AttributeMapping = {
-    "value": 0,
-    "direction": 1,
-    "per": 2,
-};
 exports.Sort = Sort;
 providers.provide("sort", Sort);
 //# sourceMappingURL=sort.js.map

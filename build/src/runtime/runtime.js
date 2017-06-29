@@ -52,9 +52,9 @@ var Database = (function () {
         return this.index.toTriples(true);
     };
     Database.prototype.analyze = function (e, d) { };
+    Database.id = 1;
     return Database;
 }());
-Database.id = 1;
 exports.Database = Database;
 //---------------------------------------------------------------------
 // Evaluation

@@ -77,22 +77,22 @@ var TimeAgent = (function () {
     TimeAgent.prototype.close = function () {
         clearTimeout(this.timeout);
     };
+    TimeAgent.attributeOrdering = ["year", "month", "day", "hours", "hours-24", "ampm", "minutes", "time-string", "seconds", "timestamp", "frames"];
+    TimeAgent.updateIntervals = {
+        "year": 1000 * 60 * 60,
+        "month": 1000 * 60 * 60,
+        "day": 1000 * 60 * 60,
+        "hours": 1000 * 60 * 60,
+        "hours-24": 1000 * 60 * 60,
+        "ampm": 1000 * 60 * 60,
+        "minutes": 1000 * 60,
+        "time-string": 1000 * 60,
+        "seconds": 1000,
+        "timestamp": 1000,
+        "frames": 16,
+    };
     return TimeAgent;
 }());
-TimeAgent.attributeOrdering = ["year", "month", "day", "hours", "hours-24", "ampm", "minutes", "time-string", "seconds", "timestamp", "frames"];
-TimeAgent.updateIntervals = {
-    "year": 1000 * 60 * 60,
-    "month": 1000 * 60 * 60,
-    "day": 1000 * 60 * 60,
-    "hours": 1000 * 60 * 60,
-    "hours-24": 1000 * 60 * 60,
-    "ampm": 1000 * 60 * 60,
-    "minutes": 1000 * 60,
-    "time-string": 1000 * 60,
-    "seconds": 1000,
-    "timestamp": 1000,
-    "frames": 16,
-};
 var MemoryAgent = (function () {
     function MemoryAgent() {
     }

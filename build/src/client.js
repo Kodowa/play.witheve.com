@@ -315,8 +315,7 @@ var EveClient = (function () {
         onHashChange({});
     };
     EveClient.prototype._css = function (data) {
-        var appIframe = document.getElementById('app-preview-iframe');
-        appIframe.contentWindow.document.getElementById("app-styles").innerHTML = data.css;
+        document.getElementById("app-styles").innerHTML = data.css;
     };
     EveClient.prototype._parse = function (data) {
         if (!this.showIDE)

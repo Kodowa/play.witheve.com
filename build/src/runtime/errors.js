@@ -23,9 +23,9 @@ var EveError = (function () {
         spans.push(this.start, this.stop, SPAN_TYPE, this.id);
         extraInfo[this.id] = this;
     };
+    EveError.ID = 0;
     return EveError;
 }());
-EveError.ID = 0;
 //--------------------------------------------------------------
 // Parse error utils
 //--------------------------------------------------------------

@@ -78,16 +78,16 @@ var Split = (function (_super) {
         proposal.cardinality = proposal.index.length;
         return proposal;
     };
+    Split.AttributeMapping = {
+        "text": 0,
+        "by": 1,
+    };
+    Split.ReturnMapping = {
+        "token": 0,
+        "index": 1,
+    };
     return Split;
 }(join_1.Constraint));
-Split.AttributeMapping = {
-    "text": 0,
-    "by": 1,
-};
-Split.ReturnMapping = {
-    "token": 0,
-    "index": 1,
-};
 // substring over the field 'text', with the base index being 1, inclusive, 'from' defaulting
 // to the beginning of the string, and 'to' the end
 var Substring = (function (_super) {
@@ -133,16 +133,16 @@ var Substring = (function (_super) {
         }
         return proposal;
     };
+    Substring.AttributeMapping = {
+        "text": 0,
+        "from": 1,
+        "to": 2,
+    };
+    Substring.ReturnMapping = {
+        "value": 0,
+    };
     return Substring;
 }(join_1.Constraint));
-Substring.AttributeMapping = {
-    "text": 0,
-    "from": 1,
-    "to": 2,
-};
-Substring.ReturnMapping = {
-    "value": 0,
-};
 var Find = (function (_super) {
     __extends(Find, _super);
     function Find(id, args, returns) {
@@ -212,18 +212,18 @@ var Find = (function (_super) {
         proposal.index = indexes;
         return proposal;
     };
+    Find.AttributeMapping = {
+        "text": 0,
+        "subtext": 1,
+        "case-sensitive": 2,
+        "from": 3,
+    };
+    Find.ReturnMapping = {
+        "string-position": 0,
+        "result-index": 0,
+    };
     return Find;
 }(join_1.Constraint));
-Find.AttributeMapping = {
-    "text": 0,
-    "subtext": 1,
-    "case-sensitive": 2,
-    "from": 3,
-};
-Find.ReturnMapping = {
-    "string-position": 0,
-    "result-index": 0,
-};
 var Convert = (function (_super) {
     __extends(Convert, _super);
     function Convert() {
@@ -285,15 +285,15 @@ var Convert = (function (_super) {
         }
         return proposal;
     };
+    Convert.AttributeMapping = {
+        "value": 0,
+        "to": 1,
+    };
+    Convert.ReturnMapping = {
+        "converted": 0,
+    };
     return Convert;
 }(join_1.Constraint));
-Convert.AttributeMapping = {
-    "value": 0,
-    "to": 1,
-};
-Convert.ReturnMapping = {
-    "converted": 0,
-};
 // Urlencode a string
 var Urlencode = (function (_super) {
     __extends(Urlencode, _super);
@@ -323,14 +323,14 @@ var Urlencode = (function (_super) {
         proposal.providing = proposed;
         return proposal;
     };
+    Urlencode.AttributeMapping = {
+        "text": 0
+    };
+    Urlencode.ReturnMapping = {
+        "value": 0,
+    };
     return Urlencode;
 }(join_1.Constraint));
-Urlencode.AttributeMapping = {
-    "text": 0
-};
-Urlencode.ReturnMapping = {
-    "value": 0,
-};
 var Length = (function (_super) {
     __extends(Length, _super);
     function Length() {
@@ -407,12 +407,12 @@ var Length = (function (_super) {
         }
         return symbolCount;
     };
+    Length.AttributeMapping = {
+        "text": 0,
+        "as": 1,
+    };
     return Length;
 }(join_1.Constraint));
-Length.AttributeMapping = {
-    "text": 0,
-    "as": 1,
-};
 //---------------------------------------------------------------------
 // Internal providers
 //---------------------------------------------------------------------

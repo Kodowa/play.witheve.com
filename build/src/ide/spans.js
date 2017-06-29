@@ -211,10 +211,10 @@ var Span = (function () {
     Span.style = function () {
         return this._spanStyle;
     };
+    Span._nextId = 0;
+    Span._editorControlled = true;
     return Span;
 }());
-Span._nextId = 0;
-Span._editorControlled = true;
 exports.Span = Span;
 var InlineSpan = (function (_super) {
     __extends(InlineSpan, _super);
@@ -285,9 +285,9 @@ var InlineSpan = (function (_super) {
         this.clear("+normalize");
         this.editor.markSpan(from, to, this.source);
     };
+    InlineSpan._spanStyle = "inline";
     return InlineSpan;
 }(Span));
-InlineSpan._spanStyle = "inline";
 exports.InlineSpan = InlineSpan;
 var LineSpan = (function (_super) {
     __extends(LineSpan, _super);
@@ -385,9 +385,9 @@ var LineSpan = (function (_super) {
         var cur = doc.getRange(loc.from, to);
         doc.replaceRange(cur.trim(), loc.from, to, "+normalize");
     };
+    LineSpan._spanStyle = "line";
     return LineSpan;
 }(Span));
-LineSpan._spanStyle = "line";
 exports.LineSpan = LineSpan;
 var BlockSpan = (function (_super) {
     __extends(BlockSpan, _super);
@@ -464,9 +464,9 @@ var BlockSpan = (function (_super) {
             this.editor.markSpan(from, to, this.source);
         }
     };
+    BlockSpan._spanStyle = "block";
     return BlockSpan;
 }(Span));
-BlockSpan._spanStyle = "block";
 exports.BlockSpan = BlockSpan;
 var ListItemSpan = (function (_super) {
     __extends(ListItemSpan, _super);
@@ -840,10 +840,10 @@ var ParserSpan = (function (_super) {
         _this._spanStyle = "inline";
         return _this;
     }
+    ParserSpan._editorControlled = false;
+    ParserSpan._spanStyle = "inline";
     return ParserSpan;
 }(Span));
-ParserSpan._editorControlled = false;
-ParserSpan._spanStyle = "inline";
 exports.ParserSpan = ParserSpan;
 var DocumentCommentSpan = (function (_super) {
     __extends(DocumentCommentSpan, _super);

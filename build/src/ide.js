@@ -2498,8 +2498,7 @@ var IDE = (function () {
         else {
             // Empty file
         }
-        var appIframe = document.getElementById('app-preview-iframe');
-        appIframe.contentWindow.document.getElementById("app-styles").innerHTML = css;
+        document.getElementById("app-styles").innerHTML = css;
         document.getElementsByClassName("CodeMirror")[0].classList.remove("cm-s-default"); // remove document wide code-styling
         this.render();
     };
@@ -2983,7 +2982,7 @@ var LanguageService = (function () {
         //console.log("SENT", args);
         client_1.client.send(args);
     };
+    LanguageService._requestId = 0;
     return LanguageService;
 }());
-LanguageService._requestId = 0;
 //# sourceMappingURL=ide.js.map

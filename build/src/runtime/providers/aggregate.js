@@ -111,14 +111,14 @@ var Aggregate = (function (_super) {
         return proposal;
     };
     Aggregate.prototype.finalizeGroup = function (group) { };
+    Aggregate.isAggregate = true;
+    Aggregate.AttributeMapping = {
+        "value": 0,
+        "given": 1,
+        "per": 2,
+    };
     return Aggregate;
 }(join_1.Constraint));
-Aggregate.isAggregate = true;
-Aggregate.AttributeMapping = {
-    "value": 0,
-    "given": 1,
-    "per": 2,
-};
 exports.Aggregate = Aggregate;
 var Sum = (function (_super) {
     __extends(Sum, _super);
@@ -271,16 +271,16 @@ var Join = (function (_super) {
     };
     // unused but to keep mr. class happy
     Join.prototype.adjustAggregate = function (group, value, projection) { };
+    Join.AttributeMapping = {
+        "value": 0,
+        "given": 1,
+        "per": 2,
+        "index": 3,
+        "with": 4,
+        "token": 0
+    };
     return Join;
 }(Aggregate));
-Join.AttributeMapping = {
-    "value": 0,
-    "given": 1,
-    "per": 2,
-    "index": 3,
-    "with": 4,
-    "token": 0
-};
 exports.Join = Join;
 providers.provide("sum", Sum);
 providers.provide("count", Count);

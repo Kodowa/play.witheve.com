@@ -24,20 +24,8 @@ exports.setActiveIds = setActiveIds;
 // MicroReact-based record renderer
 //---------------------------------------------------------
 exports.renderer = new microReact_1.Renderer();
-// wrap the app preview into a custom iframe
-var appPreviewIframe = document.createElement('iframe');
-appPreviewIframe.id = 'app-preview-iframe';
-appPreviewIframe.setAttribute('style', 'border: 0');
-document.body.appendChild(appPreviewIframe);
-// save iframe window and document refs for later
-var appPreviewWindow = appPreviewIframe.contentWindow;
-var appPreviewdoc = appPreviewWindow.document;
-appPreviewdoc.open();
-appPreviewdoc.write("\n<html>\n    <head>\n        <title>App Preview</title>\n        <link rel=\"stylesheet\" type=\"text/css\" href=\"assets/css/app-preview.css\">\n        <style id=\"app-styles\"></style>\n    </head>\n    <body></body>\n</html>\n");
-appPreviewdoc.close();
+document.body.appendChild(exports.renderer.content);
 exports.renderer.content.classList.add("application-root");
-appPreviewdoc.body.appendChild(exports.renderer.content);
-exports.renderer.content = appPreviewdoc.body;
 // These will get maintained by the client as diffs roll in
 exports.sentInputValues = {};
 exports.activeIds = {};
@@ -421,8 +409,9 @@ function renderRecords() {
             }
             else if (attribute === "value") {
                 var input = elem;
-                if (!value) {
+                if (!value || !value.length || !value[0]) {
                     input.value = "";
+                    input.setAttribute("value", "");
                 }
                 else if (value.length > 1) {
                     console.error("Unable to set 'value' multiple times on entity", entity, JSON.stringify(value));
@@ -569,11 +558,7 @@ function addRootEvent(elem, event, objs, eventName) {
     };
     objs.push(eveEvent);
 }
-/**
- * @param event
- */
-// @todo: choose a more suitable name
-function ideAppOnClick(event) {
+window.addEventListener("click", function (event) {
     var target = event.target;
     var current = target;
     var objs = [];
@@ -607,10 +592,8 @@ function ideAppOnClick(event) {
             event.preventDefault();
         }
     }
-}
-appPreviewWindow.addEventListener("click", ideAppOnClick);
-window.addEventListener("click", ideAppOnClick);
-window.addEventListener("dblclick", handleBasicEventWithTarget("dblclick"));
+});
+window.addEventListener("dblclick", handleBasicEventWithTarget("double-click"));
 window.addEventListener("mousedown", handleBasicEventWithTarget("mousedown"));
 window.addEventListener("mouseup", handleBasicEventWithTarget("mouseup"));
 window.addEventListener("input", function (event) {
